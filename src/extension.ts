@@ -67,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(statusBar);
 }
 
-export function deactivate() {}
+export function deactivate() { }
 
 /**
  * Webview provider for sidebar
@@ -77,7 +77,7 @@ class ClaudeChatWebviewProvider implements vscode.WebviewViewProvider {
 		private readonly extensionUri: vscode.Uri,
 		private readonly context: vscode.ExtensionContext,
 		private readonly chatProvider: ClaudeChatProvider
-	) {}
+	) { }
 
 	resolveWebviewView(webviewView: vscode.WebviewView) {
 		webviewView.webview.options = {
@@ -332,7 +332,7 @@ class ClaudeChatProvider {
 					}
 				});
 			},
-			onResult: (data: any) => {
+			onResult: async (data: any) => {
 				this.postMessage({ type: 'result', data });
 				this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
 				this.postMessage({ type: 'clearLoading' });
@@ -361,6 +361,13 @@ class ClaudeChatProvider {
 						}
 					});
 				}
+
+				// Auto-save conversation after each response
+				await this.conversationManager.saveConversation();
+
+				// Refresh conversation list to update timestamps
+				const conversations = this.conversationManager.getConversationList();
+				this.postMessage({ type: 'conversationList', data: conversations });
 			},
 			onError: (error: string) => {
 				this.sendAndSaveMessage({ type: 'error', data: error });
@@ -406,21 +413,30 @@ class ClaudeChatProvider {
 		const config = vscode.workspace.getConfiguration('claudeCodeChat');
 		const yoloMode = config.get<boolean>('permissions.yoloMode', false);
 
+		console.log('[Extension] ========== PERMISSION MODE CHECK ==========');
+		console.log('[Extension] YOLO Mode enabled:', yoloMode);
+
 		if (yoloMode) {
 			args.push('--dangerously-skip-permissions');
+			console.log('[Extension] Added --dangerously-skip-permissions flag');
 		} else {
-			args.push('--permission-prompt-tool', 'stdio');
+			// Set permission mode based on plan mode
+			// 'default' mode should prompt for permissions via control_request
+			console.log('[Extension] YOLO mode disabled - setting permission mode');
+			if (planMode) {
+				args.push('--permission-mode', 'plan');
+				console.log('[Extension] Using permission mode: plan');
+			} else {
+				// Try 'default' mode which should send control_request messages
+				args.push('--permission-mode', 'default');
+				console.log('[Extension] Using permission mode: default');
+			}
 		}
 
 		// Add MCP config
 		const mcpConfigPath = this.getMCPConfigPath();
 		if (mcpConfigPath) {
 			args.push('--mcp-config', mcpConfigPath);
-		}
-
-		// Add plan mode
-		if (planMode) {
-			args.push('--permission-mode', 'plan');
 		}
 
 		// Add thinking mode
@@ -439,6 +455,11 @@ class ClaudeChatProvider {
 		if (session.sessionId) {
 			args.push('--resume', session.sessionId);
 		}
+
+		console.log('[Extension] ========== FINAL ARGS CHECK ==========');
+		console.log('[Extension] Complete args array:', JSON.stringify(args, null, 2));
+		console.log('[Extension] Args includes permission-mode:', args.includes('--permission-mode'));
+		console.log('[Extension] Permission mode value:', args[args.indexOf('--permission-mode') + 1]);
 
 		this.isProcessing = true;
 
@@ -538,6 +559,7 @@ class ClaudeChatProvider {
 		const tool_name = requestData.request?.tool_name || requestData.tool_name;
 		const input = requestData.request?.input || requestData.input;
 
+		console.log('[Extension] ⚠️ PERMISSION REQUEST RECEIVED ⚠️');
 		console.log('[Extension] Control request RAW:', JSON.stringify(requestData, null, 2));
 		console.log('[Extension] Control request:', { request_id, tool_name, input });
 
@@ -563,6 +585,7 @@ class ClaudeChatProvider {
 				id: request_id,
 				toolName: tool_name,
 				input,
+				status: 'pending',
 				suggestions: requestData.request?.suggestions || requestData.suggestions
 			}
 		});
@@ -628,26 +651,55 @@ class ClaudeChatProvider {
 	 * Send permission response to Claude
 	 */
 	private sendPermissionResponse(requestId: string, approved: boolean) {
+		console.log('[Extension] ========== SENDING PERMISSION RESPONSE ==========');
+		console.log('[Extension] Request ID:', requestId);
+		console.log('[Extension] Approved:', approved);
+
 		const response = {
 			type: 'control_response',
 			request_id: requestId,
 			response: approved ? { approved: true } : { error: 'Permission denied' }
 		};
 
-		console.log('[Extension] Sending control response:', JSON.stringify(response));
+		console.log('[Extension] Response object:', JSON.stringify(response, null, 2));
 		const responseStr = JSON.stringify(response) + '\n';
-		console.log('[Extension] Response string length:', responseStr.length);
+		console.log('[Extension] Response string:', responseStr);
+		console.log('[Extension] Response bytes:', Buffer.from(responseStr).length);
+
+		// Check stdin state before write
+		console.log('[Extension] Process running before write:', this.processManager.isRunning());
+
 		const writeResult = this.processManager.write(responseStr);
 		console.log('[Extension] Write result:', writeResult);
 
 		// Verify the process is still running
 		if (this.processManager.isRunning()) {
-			console.log('[Extension] Process is still running after write');
+			console.log('[Extension] Process is still running after write ✓');
 		} else {
-			console.error('[Extension] Process died after write!');
+			console.error('[Extension] Process died after write! ✗');
 		}
 
 		this.postMessage({ type: 'updatePermissionStatus', data: { id: requestId, status: approved ? 'approved' : 'denied' } });
+
+		// Monitor for response
+		console.log('[Extension] Waiting for Claude response...');
+		let checkCount = 0;
+		const checkInterval = setInterval(() => {
+			checkCount++;
+			console.log(`[Extension] Check ${checkCount}/5: isProcessing=${this.isProcessing}, processRunning=${this.processManager.isRunning()}`);
+			if (checkCount >= 5) {
+				clearInterval(checkInterval);
+			}
+		}, 2000);
+
+		// Set a timeout to detect if Claude isn't responding
+		setTimeout(() => {
+			clearInterval(checkInterval);
+			if (this.isProcessing && this.processManager.isRunning()) {
+				console.warn('[Extension] Claude has not responded 10 seconds after permission approval');
+				console.warn('[Extension] This might indicate the process is stuck');
+			}
+		}, 10000);
 	}
 
 	/**
@@ -684,6 +736,13 @@ class ClaudeChatProvider {
 	 */
 	async loadConversation(filename: string) {
 		console.log('[Extension] loadConversation called with filename:', filename);
+
+		// Stop any active process first
+		if (this.isProcessing || this.processManager.isRunning()) {
+			console.log('[Extension] Stopping active process before loading conversation');
+			await this.stopProcess();
+			this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
+		}
 
 		// Save current conversation before loading another
 		await this.conversationManager.saveConversation();

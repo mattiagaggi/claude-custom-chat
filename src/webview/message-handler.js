@@ -103,9 +103,8 @@ window.addEventListener('message', event => {
 				hideProcessingIndicator();
 
 				// Send next queued message if any exist
-				if (queuedMessage) {
-					const queued = queuedMessage;
-					queuedMessage = null;
+				if (messageQueue.length > 0) {
+					const queued = messageQueue.shift(); // Remove and get first message
 
 					// Send the queued message
 					vscode.postMessage({
@@ -327,6 +326,7 @@ window.addEventListener('message', event => {
 
 			// Reset state
 			currentStreamingMessageId = null;
+			messageQueue.length = 0; // Clear any queued messages
 
 			// Show ready message
 			addMessage('New chat started. Ready for your message!', 'system');
@@ -338,9 +338,10 @@ window.addEventListener('message', event => {
 
 			// Clear processing state
 			isProcessing = false;
-			clearRequestTimer();
+			stopRequestTimer();
 			hideStopButton();
 			enableButtons();
+			messageQueue.length = 0; // Clear any queued messages
 
 			// Clear current messages
 			const msgDiv = document.getElementById('messages');

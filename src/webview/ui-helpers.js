@@ -169,6 +169,9 @@ function hideStopButton() {
 function stopRequest() {
 	sendStats('Stop request');
 
+	// Clear the message queue when stopping
+	messageQueue.length = 0;
+
 	vscode.postMessage({
 		type: 'stopRequest'
 	});

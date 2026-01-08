@@ -1,6 +1,8 @@
 // Permission handling functions
 
 function addPermissionRequestMessage(data) {
+	console.log('[addPermissionRequestMessage] Received permission request:', data);
+
 	const messagesDiv = document.getElementById('messages');
 	const shouldScroll = shouldAutoScroll(messagesDiv);
 
@@ -11,6 +13,8 @@ function addPermissionRequestMessage(data) {
 
 	const toolName = data.toolName || data.tool || 'Unknown Tool';
 	const status = data.status || 'pending';
+
+	console.log('[addPermissionRequestMessage] Rendering with:', { id: data.id, toolName, status });
 
 	// Create always allow button text with command styling for Bash
 	let alwaysAllowText = `Always allow ${toolName}`;
@@ -93,6 +97,14 @@ function addPermissionRequestMessage(data) {
 
 	messageDiv.innerHTML = contentHtml;
 	messagesDiv.appendChild(messageDiv);
+
+	console.log('[addPermissionRequestMessage] Permission request added to DOM:', {
+		id: data.id,
+		status: messageDiv.dataset.status,
+		buttonsPresent: messageDiv.querySelector('.permission-buttons') !== null,
+		buttonsCount: messageDiv.querySelectorAll('.permission-buttons button').length
+	});
+
 	scrollToBottomIfNeeded(messagesDiv, shouldScroll);
 }
 
@@ -141,13 +153,17 @@ function expireAllPendingPermissions() {
 }
 
 function respondToPermission(id, approved, alwaysAllow = false) {
+	console.log('[respondToPermission] Called with:', { id, approved, alwaysAllow });
+
 	// Send response back to extension
+	console.log('[respondToPermission] Sending message to extension');
 	vscode.postMessage({
 		type: 'permissionResponse',
 		requestId: id,
 		approved: approved,
 		alwaysAllow: alwaysAllow
 	});
+	console.log('[respondToPermission] Message sent');
 
 	// Update the UI to show the decision
 	const permissionMsg = document.querySelector(`.permission-request:has([onclick*="${id}"])`);
