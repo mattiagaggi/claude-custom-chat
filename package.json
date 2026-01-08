@@ -57,6 +57,21 @@
         "title": "Open Claude Code Chat",
         "category": "Claude Code Chat",
         "icon": "icon-bubble.png"
+      },
+      {
+        "command": "claude-code-chat.openChat1",
+        "title": "Open Claude Chat 1 (Left)",
+        "category": "Claude Code Chat"
+      },
+      {
+        "command": "claude-code-chat.openChat2",
+        "title": "Open Claude Chat 2 (Center)",
+        "category": "Claude Code Chat"
+      },
+      {
+        "command": "claude-code-chat.openChat3",
+        "title": "Open Claude Chat 3 (Right)",
+        "category": "Claude Code Chat"
       }
     ],
     "keybindings": [

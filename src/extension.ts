@@ -20,22 +20,40 @@ class DiffContentProvider implements vscode.TextDocumentContentProvider {
 }
 
 export function activate(context: vscode.ExtensionContext) {
-	const provider = new ClaudeChatProvider(context.extensionUri, context);
+	// Create multiple providers for multi-chat support
+	const providers = [
+		new ClaudeChatProvider(context.extensionUri, context, 1),
+		new ClaudeChatProvider(context.extensionUri, context, 2),
+		new ClaudeChatProvider(context.extensionUri, context, 3)
+	];
 
 	context.subscriptions.push(
+		// Main command - opens in column Two
 		vscode.commands.registerCommand('claude-code-chat.openChat', (column?: vscode.ViewColumn) => {
-			provider.show(column);
+			providers[0].show(column || vscode.ViewColumn.Two);
+		}),
+		// Open chat in column One (left)
+		vscode.commands.registerCommand('claude-code-chat.openChat1', () => {
+			providers[0].show(vscode.ViewColumn.One);
+		}),
+		// Open chat in column Two (center)
+		vscode.commands.registerCommand('claude-code-chat.openChat2', () => {
+			providers[1].show(vscode.ViewColumn.Two);
+		}),
+		// Open chat in column Three (right)
+		vscode.commands.registerCommand('claude-code-chat.openChat3', () => {
+			providers[2].show(vscode.ViewColumn.Three);
 		}),
 		vscode.commands.registerCommand('claude-code-chat.loadConversation', (filename: string) => {
-			provider.loadConversation(filename);
+			providers[0].loadConversation(filename);
 		}),
 		vscode.window.registerWebviewViewProvider('claude-code-chat.chat',
-			new ClaudeChatWebviewProvider(context.extensionUri, context, provider)
+			new ClaudeChatWebviewProvider(context.extensionUri, context, providers[0])
 		),
 		vscode.workspace.registerTextDocumentContentProvider('claude-diff', new DiffContentProvider()),
 		vscode.workspace.onDidChangeConfiguration(event => {
 			if (event.affectsConfiguration('claudeCodeChat.wsl')) {
-				provider.newSession();
+				providers.forEach(p => p.newSession());
 			}
 		})
 	);
@@ -102,11 +120,14 @@ class ClaudeChatProvider {
 	private isProcessing = false;
 	private selectedModel = 'default';
 	private pendingPermissions = new Map<string, any>();
+	private chatNumber: number;
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
-		private readonly context: vscode.ExtensionContext
+		private readonly context: vscode.ExtensionContext,
+		chatNumber: number = 1
 	) {
+		this.chatNumber = chatNumber;
 		// Initialize managers
 		this.processManager = new ProcessManager();
 		this.conversationManager = new ConversationManager(context);
@@ -137,7 +158,7 @@ class ClaudeChatProvider {
 
 		this.panel = vscode.window.createWebviewPanel(
 			'claudeChat',
-			'Claude Code Chat',
+			`Claude Code Chat ${this.chatNumber > 1 ? this.chatNumber : ''}`.trim(),
 			actualColumn,
 			{
 				enableScripts: true,
@@ -528,6 +549,10 @@ class ClaudeChatProvider {
 	 */
 	async newSession() {
 		await this.stopProcess();
+
+		// Save current conversation before starting new one
+		await this.conversationManager.saveConversation();
+
 		this.conversationManager.startConversation();
 		this.postMessage({ type: 'sessionCleared' });
 		this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
@@ -537,9 +562,27 @@ class ClaudeChatProvider {
 	 * Load conversation
 	 */
 	async loadConversation(filename: string) {
+		// Save current conversation before loading another
+		await this.conversationManager.saveConversation();
+
+		// Load the conversation
 		const conversation = await this.conversationManager.loadConversation(filename);
 		if (conversation) {
+			// Send conversation data to webview
 			this.postMessage({ type: 'conversationLoaded', data: conversation });
+
+			// Update session info
+			const session = this.conversationManager.getCurrentSession();
+			this.postMessage({
+				type: 'sessionInfo',
+				data: {
+					sessionId: session.sessionId,
+					totalTokensInput: session.totalTokensInput,
+					totalTokensOutput: session.totalTokensOutput,
+					totalCost: session.totalCost,
+					requestCount: session.messageCount
+				}
+			});
 		}
 	}
 
@@ -747,7 +790,10 @@ class ClaudeChatProvider {
 		return path.join(storagePath, 'mcp', 'mcp-servers.json');
 	}
 
-	dispose() {
+	async dispose() {
+		// Save conversation before disposal
+		await this.conversationManager.saveConversation();
+
 		// Clean up process
 		this.processManager.terminate();
 

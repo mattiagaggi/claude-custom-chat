@@ -125,15 +125,16 @@ function displayConversationList(conversations) {
 		const convItem = document.createElement('div');
 		convItem.className = 'conversation-item';
 
-		const date = new Date(conv.timestamp);
+		const date = new Date(conv.startTime);
 		const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+		const preview = conv.summary || conv.firstUserMessage || 'New conversation';
 
 		convItem.innerHTML = `
-			<div class="conversation-preview">${conv.preview || 'New conversation'}</div>
+			<div class="conversation-preview">${preview}</div>
 			<div class="conversation-date">${dateStr}</div>
 		`;
 
-		convItem.onclick = () => loadConversation(conv.id);
+		convItem.onclick = () => loadConversation(conv.filename);
 		conversationList.appendChild(convItem);
 	});
 }

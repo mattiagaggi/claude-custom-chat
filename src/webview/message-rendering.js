@@ -112,7 +112,9 @@ function sendMessage() {
 	if (message && !isProcessing) {
 		vscode.postMessage({
 			type: 'message',
-			content: message
+			content: message,
+			planMode: planModeEnabled,
+			thinkingMode: thinkingModeEnabled
 		});
 		messageInput.value = '';
 		adjustTextareaHeight();
@@ -121,6 +123,13 @@ function sendMessage() {
 
 function togglePlanMode() {
 	planModeEnabled = !planModeEnabled;
+
+	// Update UI
+	const planModeSwitch = document.getElementById('planModeSwitch');
+	if (planModeSwitch) {
+		planModeSwitch.classList.toggle('active', planModeEnabled);
+	}
+
 	vscode.postMessage({
 		type: 'togglePlanMode',
 		enabled: planModeEnabled

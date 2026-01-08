@@ -19,6 +19,7 @@ export interface ConversationIndex {
 	totalCost: number;
 	firstUserMessage: string;
 	lastUserMessage: string;
+	summary?: string;
 }
 
 export class ConversationManager {
@@ -130,6 +131,44 @@ export class ConversationManager {
 	}
 
 	/**
+	 * Generate a summary from conversation messages
+	 */
+	private _generateSummary(): string {
+		const userMessages = this._currentConversation.filter(m => m.messageType === 'userInput');
+
+		if (userMessages.length === 0) {
+			return 'New conversation';
+		}
+
+		// Get first meaningful user message
+		const firstMessage = userMessages[0]?.data || '';
+
+		// Clean up the message - remove file references, paths, and extra whitespace
+		let summary = firstMessage
+			.replace(/@[\w\/\.\-]+\s*/g, '') // Remove @file references
+			.replace(/\/[\w\/\.\-]+/g, '') // Remove file paths
+			.replace(/\s+/g, ' ') // Normalize whitespace
+			.trim();
+
+		// Capitalize first letter
+		if (summary.length > 0) {
+			summary = summary.charAt(0).toUpperCase() + summary.slice(1);
+		}
+
+		// Truncate to reasonable length (60 chars max)
+		if (summary.length > 60) {
+			summary = summary.substring(0, 57) + '...';
+		}
+
+		// If summary is too short or empty, provide a generic title
+		if (summary.length < 3) {
+			summary = 'New conversation';
+		}
+
+		return summary;
+	}
+
+	/**
 	 * Update conversation index
 	 */
 	private _updateIndex(filename: string, conversationData: ConversationData): void {
@@ -137,6 +176,9 @@ export class ConversationManager {
 		const userMessages = this._currentConversation.filter(m => m.messageType === 'userInput');
 		const firstUserMessage = userMessages[0]?.data || 'No messages';
 		const lastUserMessage = userMessages[userMessages.length - 1]?.data || firstUserMessage;
+
+		// Generate summary
+		const summary = this._generateSummary();
 
 		// Update or add to index
 		const existingIndex = this._conversationIndex.findIndex(c => c.filename === filename);
@@ -148,7 +190,8 @@ export class ConversationManager {
 			messageCount: conversationData.messageCount,
 			totalCost: conversationData.totalCost,
 			firstUserMessage: firstUserMessage.substring(0, 100),
-			lastUserMessage: lastUserMessage.substring(0, 100)
+			lastUserMessage: lastUserMessage.substring(0, 100),
+			summary
 		};
 
 		if (existingIndex >= 0) {
@@ -182,7 +225,13 @@ export class ConversationManager {
 	 * Load a conversation from file
 	 */
 	public async loadConversation(filename: string): Promise<ConversationData | undefined> {
+		// Ensure initialized
 		if (!this._conversationsPath) {
+			await this._initialize();
+		}
+
+		if (!this._conversationsPath) {
+			console.error('Failed to initialize conversations path');
 			return undefined;
 		}
 

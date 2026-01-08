@@ -310,5 +310,43 @@ window.addEventListener('message', event => {
 			addMessage('New chat started. Ready for your message!', 'system');
 			updateStatusWithTotals();
 			break;
+
+		case 'conversationLoaded':
+			// Clear current messages
+			const msgDiv = document.getElementById('messages');
+			msgDiv.innerHTML = '';
+			currentStreamingMessageId = null;
+
+			// Load conversation messages
+			if (message.data && message.data.messages) {
+				message.data.messages.forEach(msg => {
+					if (msg.messageType === 'userInput') {
+						addMessage(parseSimpleMarkdown(msg.data), 'user');
+					} else if (msg.messageType === 'output' || msg.messageType === 'assistantMessage') {
+						addMessage(parseSimpleMarkdown(msg.data), 'claude');
+					} else if (msg.messageType === 'error') {
+						addMessage(msg.data, 'error');
+					} else if (msg.messageType === 'system') {
+						addMessage(msg.data, 'system');
+					} else if (msg.messageType === 'toolUse') {
+						addToolUseMessage(msg.data);
+					} else if (msg.messageType === 'toolResult') {
+						addToolResultMessage(msg.data);
+					}
+				});
+			}
+
+			// Update usage stats
+			if (message.data.totalTokens) {
+				totalTokensInput = message.data.totalTokens.input || 0;
+				totalTokensOutput = message.data.totalTokens.output || 0;
+				totalCost = message.data.totalCost || 0;
+				requestCount = message.data.messageCount || 0;
+			}
+			updateStatusWithTotals();
+
+			// Close history view
+			toggleConversationHistory();
+			break;
 	}
 });
