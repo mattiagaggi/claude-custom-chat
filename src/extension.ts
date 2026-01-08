@@ -598,9 +598,23 @@ class ClaudeChatProvider {
 			// Not using WSL
 			this._isWslProcess = false;
 
-			// Use native claude command
+			// Use native claude command directly
 			console.log('Using native Claude command');
-			claudeProcess = cp.spawn('claude', args, {
+
+			// On macOS, claude is typically in /opt/homebrew/bin or /usr/local/bin
+			// We need to use the absolute path since shell:false doesn't use PATH
+			let claudeCommand = 'claude';
+			if (process.platform === 'darwin') {
+				// Try to find claude in common locations
+				const fs = require('fs');
+				if (fs.existsSync('/opt/homebrew/bin/claude')) {
+					claudeCommand = '/opt/homebrew/bin/claude';
+				} else if (fs.existsSync('/usr/local/bin/claude')) {
+					claudeCommand = '/usr/local/bin/claude';
+				}
+			}
+
+			claudeProcess = cp.spawn(claudeCommand, args, {
 				signal: this._abortController.signal,
 				shell: process.platform === 'win32',
 				detached: process.platform !== 'win32',
@@ -608,6 +622,10 @@ class ClaudeChatProvider {
 				stdio: ['pipe', 'pipe', 'pipe'],
 				env: {
 					...process.env,
+					// Ensure PATH includes Homebrew locations
+					PATH: `${process.env.PATH || ''}:/opt/homebrew/bin:/usr/local/bin`,
+					HOME: process.env.HOME || require('os').homedir(),
+					USER: process.env.USER,
 					FORCE_COLOR: '0',
 					NO_COLOR: '1'
 				}
@@ -621,17 +639,6 @@ class ClaudeChatProvider {
 		// Don't end stdin yet - we need to keep it open for permission responses
 		if (claudeProcess.stdin) {
 			// First, send an initialize request to get account info (once per session)
-			if (!this._accountInfoFetchedThisSession) {
-				this._accountInfoFetchedThisSession = true;
-				const initRequest = {
-					type: 'control_request',
-					request_id: 'init-' + Date.now(),
-					request: {
-						subtype: 'initialize'
-					}
-				};
-				claudeProcess.stdin.write(JSON.stringify(initRequest) + '\n');
-			}
 
 			const userMessage = {
 				type: 'user',
@@ -677,6 +684,12 @@ class ClaudeChatProvider {
 
 							// Handle result message - end stdin when done
 							if (jsonData.type === 'result') {
+								// Unlock UI immediately when we get the result, don't wait for process exit
+								// This fixes the issue where the spinner gets stuck if the process takes time to close
+								this._postMessage({ type: 'setProcessing', data: { isProcessing: false } });
+								this._postMessage({ type: 'clearLoading' });
+								this._isProcessing = false;
+
 								if (claudeProcess.stdin && !claudeProcess.stdin.destroyed) {
 									claudeProcess.stdin.end();
 								}
@@ -685,6 +698,14 @@ class ClaudeChatProvider {
 							this._processJsonStreamData(jsonData);
 						} catch (error) {
 							console.log('Failed to parse JSON line:', line, error);
+							// Attempt to show raw output as it might be a prompt or error that isn't JSON
+							// Only show if it looks like a meaningful message (not empty)
+							if (line.trim().length > 0) {
+								this._sendAndSaveMessage({
+									type: 'error',
+									data: `[CLI Output] ${line}`
+								});
+							}
 						}
 					}
 				}
@@ -693,7 +714,18 @@ class ClaudeChatProvider {
 
 		if (claudeProcess.stderr) {
 			claudeProcess.stderr.on('data', (data) => {
-				errorOutput += data.toString();
+				const errorMsg = data.toString();
+				errorOutput += errorMsg;
+
+				// Send stderr in real-time to help debug issues
+				if (errorMsg.trim()) {
+					console.log('Claude stderr:', errorMsg);
+					// Don't save to conversation history to avoid clutter, just show in UI
+					this._postMessage({
+						type: 'error',
+						data: `[CLI Error] ${errorMsg}`
+					});
+				}
 			});
 		}
 
@@ -701,7 +733,8 @@ class ClaudeChatProvider {
 			console.log('Claude process closed with code:', code);
 			console.log('Claude stderr output:', errorOutput);
 
-			if (!this._currentClaudeProcess) {
+			if (this._currentClaudeProcess !== claudeProcess) {
+				// This process is no longer the active one, ignore its close event
 				return;
 			}
 
@@ -1007,10 +1040,13 @@ class ClaudeChatProvider {
 
 			case 'result':
 				if (jsonData.subtype === 'success') {
-					// Check for login errors
-					if (jsonData.is_error && jsonData.result && jsonData.result.includes('Invalid API key')) {
-						this._handleLoginRequired();
-						return;
+					// Check for login errors or other failures
+					if (jsonData.is_error && jsonData.result) {
+						this._sendAndSaveMessage({
+							type: 'error',
+							data: `[CLI Error] ${jsonData.result}`
+						});
+						// Don't return, let it proceed to cleanup
 					}
 
 					this._isProcessing = false;
@@ -1129,52 +1165,6 @@ class ClaudeChatProvider {
 		});
 	}
 
-	private _handleLoginRequired() {
-
-		this._isProcessing = false;
-
-		// Clear processing state
-		this._postMessage({
-			type: 'setProcessing',
-			data: { isProcessing: false }
-		});
-
-		// Show login required message
-		this._postMessage({
-			type: 'loginRequired'
-		});
-
-		// Get configuration to check if WSL is enabled
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
-		const wslEnabled = config.get<boolean>('wsl.enabled', false);
-		const wslDistro = config.get<string>('wsl.distro', 'Ubuntu');
-		const nodePath = config.get<string>('wsl.nodePath', '/usr/bin/node');
-		const claudePath = config.get<string>('wsl.claudePath', '/usr/local/bin/claude');
-
-		// Open terminal and run claude login
-		const terminal = vscode.window.createTerminal({
-			name: 'Claude Login',
-			location: { viewColumn: vscode.ViewColumn.One }
-		});
-		if (wslEnabled) {
-			terminal.sendText(`wsl -d ${wslDistro} ${nodePath} --no-warnings --enable-source-maps ${claudePath}`);
-		} else {
-			terminal.sendText('claude');
-		}
-		terminal.show();
-
-		// Show info message
-		vscode.window.showInformationMessage(
-			'Please login with your Claude plan or API key in the terminal, then come back to this chat.',
-			'OK'
-		);
-
-		// Send message to UI about terminal
-		this._postMessage({
-			type: 'terminalOpened',
-			data: `Please login with your Claude plan or API key in the terminal, then come back to this chat.`,
-		});
-	}
 
 	private async _initializeBackupRepo(): Promise<void> {
 		try {
@@ -2483,7 +2473,11 @@ class ClaudeChatProvider {
 				const fileUri = vscode.Uri.file(filePath);
 				const content = await vscode.workspace.fs.readFile(fileUri);
 				conversationData = JSON.parse(new TextDecoder().decode(content));
-			} catch {
+			} catch (error) {
+				console.error('Error reading/parsing conversation file:', error);
+				// If we failed to load the conversation, we should still let the UI know we're ready
+				// so the user isn't stuck on the loading screen
+				this._sendReadyMessage();
 				return;
 			}
 
@@ -2510,9 +2504,9 @@ class ClaudeChatProvider {
 
 						const message = messages[i];
 
-						if(message.messageType === 'permissionRequest'){
+						if (message.messageType === 'permissionRequest') {
 							const isLast = i === messages.length - 1;
-							if(!isLast){
+							if (!isLast) {
 								continue;
 							}
 						}
