@@ -111,10 +111,46 @@ export class ProcessManager {
 	 */
 	public write(data: string): boolean {
 		if (!this._currentProcess?.stdin || this._currentProcess.stdin.destroyed) {
+			console.error('[ProcessManager] Cannot write: stdin is unavailable or destroyed');
 			return false;
 		}
-		this._currentProcess.stdin.write(data);
-		return true;
+
+		const stdin = this._currentProcess.stdin;
+		console.log('[ProcessManager] Stdin state:', {
+			writable: stdin.writable,
+			writableEnded: stdin.writableEnded,
+			writableFinished: stdin.writableFinished,
+			destroyed: stdin.destroyed,
+			closed: stdin.closed
+		});
+
+		console.log('[ProcessManager] Writing to stdin (length:', data.length, '):', data.substring(0, 200));
+		console.log('[ProcessManager] Full data to write:', data);
+
+		try {
+			const result = stdin.write(data, 'utf8', (error) => {
+				if (error) {
+					console.error('[ProcessManager] Error writing to stdin:', error);
+				} else {
+					console.log('[ProcessManager] Successfully wrote to stdin, data was:', data.substring(0, 100));
+				}
+			});
+
+			console.log('[ProcessManager] Write returned:', result);
+
+			// Force flush the buffer
+			if (!result) {
+				console.warn('[ProcessManager] Write returned false (buffer full), waiting for drain');
+				stdin.once('drain', () => {
+					console.log('[ProcessManager] Stdin buffer drained');
+				});
+			}
+
+			return true;
+		} catch (error) {
+			console.error('[ProcessManager] Exception writing to stdin:', error);
+			return false;
+		}
 	}
 
 	/**

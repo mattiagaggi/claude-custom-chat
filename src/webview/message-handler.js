@@ -102,7 +102,7 @@ window.addEventListener('message', event => {
 				enableButtons();
 				hideProcessingIndicator();
 
-				// Send queued message if one exists
+				// Send next queued message if any exist
 				if (queuedMessage) {
 					const queued = queuedMessage;
 					queuedMessage = null;
@@ -174,6 +174,10 @@ window.addEventListener('message', event => {
 			messageInput.value = currentText + pathIndicator;
 			messageInput.focus();
 			adjustTextareaHeight();
+
+			// Show feedback that image was attached
+			const fileName = message.path.split('/').pop() || message.path;
+			showImageAddedFeedback(fileName);
 			break;
 
 		case 'restoreCommit':
@@ -214,6 +218,10 @@ window.addEventListener('message', event => {
 
 		case 'permissionRequest':
 			addPermissionRequestMessage(message.data);
+			break;
+
+		case 'userQuestion':
+			addUserQuestionMessage(message.data);
 			break;
 
 		case 'updatePermissionStatus':
@@ -326,6 +334,14 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'conversationLoaded':
+			console.log('[conversationLoaded] Received conversationLoaded event');
+
+			// Clear processing state
+			isProcessing = false;
+			clearRequestTimer();
+			hideStopButton();
+			enableButtons();
+
 			// Clear current messages
 			const msgDiv = document.getElementById('messages');
 			msgDiv.innerHTML = '';
@@ -369,6 +385,7 @@ window.addEventListener('message', event => {
 				messagesContainer.scrollTop = messagesContainer.scrollHeight;
 			}
 
+			console.log('[conversationLoaded] Conversation loaded successfully, closing history view');
 			// Close history view
 			toggleConversationHistory();
 			break;

@@ -237,16 +237,23 @@ export class ConversationManager {
 	 * Load a conversation from file
 	 */
 	public async loadConversation(filename: string): Promise<ConversationData | undefined> {
+		// Validate filename
+		if (!filename) {
+			console.error('[ConversationManager] loadConversation called with empty filename');
+			return undefined;
+		}
+
 		// Ensure initialized
 		if (!this._conversationsPath) {
 			await this._initialize();
 		}
 
 		if (!this._conversationsPath) {
-			console.error('Failed to initialize conversations path');
+			console.error('[ConversationManager] Failed to initialize conversations path');
 			return undefined;
 		}
 
+		console.log('[ConversationManager] Loading conversation:', filename, 'from path:', this._conversationsPath);
 		const filepath = path.join(this._conversationsPath, filename);
 		try {
 			const fs = require('fs').promises;

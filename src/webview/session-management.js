@@ -105,10 +105,12 @@ function requestConversationList() {
 }
 
 function loadConversation(conversationId) {
+	console.log('[loadConversation] Loading conversation:', conversationId);
 	vscode.postMessage({
 		type: 'loadConversation',
-		conversationId: conversationId
+		filename: conversationId
 	});
+	console.log('[loadConversation] Message posted, toggling history');
 	toggleConversationHistory();
 }
 
@@ -124,6 +126,12 @@ function displayConversationList(conversations) {
 	}
 
 	console.log('[displayConversationList] Displaying', conversations.length, 'conversations');
+
+	// Add a test click handler to the container
+	conversationList.onclick = (e) => {
+		console.log('[conversationList-click] Click detected on conversationList container', e.target);
+	};
+
 	conversations.forEach(conv => {
 		const convItem = document.createElement('div');
 		convItem.className = 'conversation-item';
@@ -137,7 +145,12 @@ function displayConversationList(conversations) {
 			<div class="conversation-date">${dateStr}</div>
 		`;
 
-		convItem.onclick = () => loadConversation(conv.filename);
+		convItem.addEventListener('click', (e) => {
+			console.log('[conversation-click] Clicked conversation:', conv.filename);
+			e.stopPropagation();
+			loadConversation(conv.filename);
+		});
+
 		conversationList.appendChild(convItem);
 	});
 }

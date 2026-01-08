@@ -237,6 +237,8 @@ class ClaudeChatProvider {
 				return this.openDiffByIndex(message.messageIndex);
 			case 'createImageFile':
 				return this.createImageFile(message.imageData, message.imageType);
+			case 'selectImageFile':
+				return this.selectImageFile();
 		}
 
 		// Delegate to message handler
@@ -264,6 +266,8 @@ class ClaudeChatProvider {
 			onSelectImage: () => this.selectImage(),
 			onPermissionResponse: (id: string, approved: boolean, alwaysAllow?: boolean) =>
 				this.handlePermissionResponse(id, approved, alwaysAllow),
+			onUserQuestionResponse: (id: string, answers: Record<string, string>) =>
+				this.handleUserQuestionResponse(id, answers),
 			onSaveInputText: (text: string) => this.saveInputText(text),
 			onDismissWSLAlert: () => this.dismissWSLAlert(),
 			onSendPermissions: () => this.sendPermissions(),
@@ -302,9 +306,31 @@ class ClaudeChatProvider {
 			},
 			onTokenUsage: (inputTokens: number, outputTokens: number) => {
 				this.conversationManager.updateUsage(0, inputTokens, outputTokens);
+
+				// Send updated usage to UI
+				const session = this.conversationManager.getCurrentSession();
+				this.postMessage({
+					type: 'usage',
+					data: {
+						inputTokens: session.totalTokensInput,
+						outputTokens: session.totalTokensOutput,
+						totalCost: session.totalCost
+					}
+				});
 			},
 			onCostUpdate: (cost: number) => {
 				this.conversationManager.updateUsage(cost, 0, 0);
+
+				// Send updated cost to UI
+				const session = this.conversationManager.getCurrentSession();
+				this.postMessage({
+					type: 'usage',
+					data: {
+						inputTokens: session.totalTokensInput,
+						outputTokens: session.totalTokensOutput,
+						totalCost: session.totalCost
+					}
+				});
 			},
 			onResult: (data: any) => {
 				this.postMessage({ type: 'result', data });
@@ -449,8 +475,17 @@ class ClaudeChatProvider {
 
 			// Handle stdout
 			process.stdout?.on('data', (data) => {
-				console.log('[Extension] Claude stdout:', data.toString().substring(0, 200));
-				this.streamParser.parseChunk(data.toString());
+				const dataStr = data.toString();
+				console.log('[Extension] Claude stdout received:', dataStr.length, 'bytes');
+				console.log('[Extension] Claude stdout content:', dataStr.substring(0, 200));
+
+				// Log each complete line
+				const lines = dataStr.split('\n').filter((l: string) => l.trim());
+				lines.forEach((line: string, idx: number) => {
+					console.log(`[Extension] Line ${idx}:`, line.substring(0, 150));
+				});
+
+				this.streamParser.parseChunk(dataStr);
 			});
 
 			// Handle stderr
@@ -503,7 +538,14 @@ class ClaudeChatProvider {
 		const tool_name = requestData.request?.tool_name || requestData.tool_name;
 		const input = requestData.request?.input || requestData.input;
 
+		console.log('[Extension] Control request RAW:', JSON.stringify(requestData, null, 2));
 		console.log('[Extension] Control request:', { request_id, tool_name, input });
+
+		// Handle AskUserQuestion specially - it's not a permission request
+		if (tool_name === 'AskUserQuestion') {
+			this.handleUserQuestion(request_id, input);
+			return;
+		}
 
 		// Check if auto-approved
 		if (await this.permissionManager.shouldAutoApprove(tool_name, input)) {
@@ -527,6 +569,23 @@ class ClaudeChatProvider {
 	}
 
 	/**
+	 * Handle AskUserQuestion tool
+	 */
+	private handleUserQuestion(requestId: string, input: any) {
+		// Store pending question
+		this.pendingPermissions.set(requestId, { request_id: requestId, tool_name: 'AskUserQuestion', input });
+
+		// Send to UI
+		this.postMessage({
+			type: 'userQuestion',
+			data: {
+				id: requestId,
+				questions: input.questions || []
+			}
+		});
+	}
+
+	/**
 	 * Handle permission response from UI
 	 */
 	private handlePermissionResponse(id: string, approved: boolean, alwaysAllow?: boolean) {
@@ -545,16 +604,50 @@ class ClaudeChatProvider {
 	}
 
 	/**
+	 * Handle user question response from UI
+	 */
+	private handleUserQuestionResponse(id: string, answers: Record<string, string>) {
+		const request = this.pendingPermissions.get(id);
+		if (!request) return;
+
+		// Send answer back to Claude
+		const response = {
+			type: 'control_response',
+			request_id: id,
+			response: { answers }
+		};
+
+		console.log('[Extension] Sending user question response:', response);
+		const writeResult = this.processManager.write(JSON.stringify(response) + '\n');
+		console.log('[Extension] Write result:', writeResult);
+
+		this.pendingPermissions.delete(id);
+	}
+
+	/**
 	 * Send permission response to Claude
 	 */
 	private sendPermissionResponse(requestId: string, approved: boolean) {
 		const response = {
 			type: 'control_response',
+			request_id: requestId,
 			response: approved ? { approved: true } : { error: 'Permission denied' }
 		};
 
-		this.processManager.write(JSON.stringify({ ...response, request_id: requestId }) + '\n');
-		this.postMessage({ type: 'permissionUpdate', data: { id: requestId, status: approved ? 'approved' : 'denied' } });
+		console.log('[Extension] Sending control response:', JSON.stringify(response));
+		const responseStr = JSON.stringify(response) + '\n';
+		console.log('[Extension] Response string length:', responseStr.length);
+		const writeResult = this.processManager.write(responseStr);
+		console.log('[Extension] Write result:', writeResult);
+
+		// Verify the process is still running
+		if (this.processManager.isRunning()) {
+			console.log('[Extension] Process is still running after write');
+		} else {
+			console.error('[Extension] Process died after write!');
+		}
+
+		this.postMessage({ type: 'updatePermissionStatus', data: { id: requestId, status: approved ? 'approved' : 'denied' } });
 	}
 
 	/**
@@ -590,12 +683,17 @@ class ClaudeChatProvider {
 	 * Load conversation
 	 */
 	async loadConversation(filename: string) {
+		console.log('[Extension] loadConversation called with filename:', filename);
+
 		// Save current conversation before loading another
 		await this.conversationManager.saveConversation();
 
 		// Load the conversation
 		const conversation = await this.conversationManager.loadConversation(filename);
+		console.log('[Extension] Conversation loaded:', conversation ? 'success' : 'failed');
+
 		if (conversation) {
+			console.log('[Extension] Sending conversationLoaded message with', conversation.messages?.length || 0, 'messages');
 			// Send conversation data to webview
 			this.postMessage({ type: 'conversationLoaded', data: conversation });
 
@@ -615,6 +713,8 @@ class ClaudeChatProvider {
 			// Refresh conversation history
 			const conversations = this.conversationManager.getConversationList();
 			this.postMessage({ type: 'conversationList', data: conversations });
+		} else {
+			console.error('[Extension] Failed to load conversation, conversation is null/undefined');
 		}
 	}
 
@@ -869,6 +969,57 @@ class ClaudeChatProvider {
 
 	private createImageFile(imageData: string, imageType: string) {
 		// Create image file from base64 data
+		const fs = require('fs');
+		const os = require('os');
+
+		// Extract base64 data (remove data:image/png;base64, prefix if present)
+		const base64Match = imageData.match(/^data:image\/\w+;base64,(.+)$/);
+		const base64String = base64Match ? base64Match[1] : imageData;
+
+		// Determine file extension from MIME type
+		const ext = imageType.replace('image/', '').replace('jpeg', 'jpg');
+		const fileName = `image-${Date.now()}.${ext}`;
+
+		// Create temp file
+		const tempDir = os.tmpdir();
+		const filePath = path.join(tempDir, fileName);
+
+		// Write the file
+		const buffer = Buffer.from(base64String, 'base64');
+		fs.writeFileSync(filePath, buffer);
+
+		// Send the path back to webview
+		this.postMessage({
+			type: 'imagePath',
+			path: filePath
+		});
+
+		// Show feedback
+		console.log(`[Extension] Created image file: ${filePath}`);
+	}
+
+	private async selectImageFile() {
+		const result = await vscode.window.showOpenDialog({
+			canSelectFiles: true,
+			canSelectFolders: false,
+			canSelectMany: false,
+			filters: {
+				'Images': ['png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg']
+			},
+			title: 'Select an image to attach'
+		});
+
+		if (result && result[0]) {
+			const filePath = result[0].fsPath;
+
+			// Send the file path back to webview - Claude CLI will read it directly
+			this.postMessage({
+				type: 'imagePath',
+				path: filePath
+			});
+
+			console.log(`[Extension] Image selected: ${filePath}`);
+		}
 	}
 
 	private sendPlatformInfo() {

@@ -136,9 +136,15 @@ fileSearchInput.addEventListener('keydown', (e) => {
 		e.preventDefault();
 		selectedFileIndex = Math.max(selectedFileIndex - 1, -1);
 		renderFileList();
-	} else if (e.key === 'Enter' && selectedFileIndex >= 0) {
+	} else if (e.key === 'Enter') {
 		e.preventDefault();
-		selectFile(filteredFiles[selectedFileIndex]);
+		if (selectedFileIndex >= 0) {
+			// Select from filtered list
+			selectFile(filteredFiles[selectedFileIndex]);
+		} else if (fileSearchInput.value.trim()) {
+			// Treat as direct path input
+			selectFile({ path: fileSearchInput.value.trim(), name: fileSearchInput.value.trim() });
+		}
 	} else if (e.key === 'Escape') {
 		e.preventDefault();
 		hideFilePicker();

@@ -144,7 +144,7 @@ function respondToPermission(id, approved, alwaysAllow = false) {
 	// Send response back to extension
 	vscode.postMessage({
 		type: 'permissionResponse',
-		id: id,
+		requestId: id,
 		approved: approved,
 		alwaysAllow: alwaysAllow
 	});
@@ -205,6 +205,94 @@ function enableYoloMode(permissionId) {
 
 	// Show notification
 	addMessage('⚡ YOLO Mode enabled! All future permissions will be automatically allowed.', 'system');
+}
+
+function addUserQuestionMessage(data) {
+	const messagesDiv = document.getElementById('messages');
+	const shouldScroll = shouldAutoScroll(messagesDiv);
+
+	const messageDiv = document.createElement('div');
+	messageDiv.className = 'message user-question';
+	messageDiv.id = `question-${data.id}`;
+
+	const questions = data.questions || [];
+
+	let questionsHtml = '';
+	questions.forEach((q, idx) => {
+		const questionId = `q${idx}`;
+		const optionsHtml = q.options.map((opt, optIdx) => {
+			const optionId = `${data.id}_${questionId}_opt${optIdx}`;
+			return `
+				<label class="question-option">
+					<input type="${q.multiSelect ? 'checkbox' : 'radio'}"
+						   name="${data.id}_${questionId}"
+						   value="${optIdx}"
+						   id="${optionId}">
+					<div class="option-content">
+						<div class="option-label">${opt.label}</div>
+						<div class="option-description">${opt.description || ''}</div>
+					</div>
+				</label>
+			`;
+		}).join('');
+
+		questionsHtml += `
+			<div class="question-block">
+				<div class="question-header">${q.header}</div>
+				<div class="question-text">${q.question}</div>
+				<div class="question-options">
+					${optionsHtml}
+				</div>
+			</div>
+		`;
+	});
+
+	messageDiv.innerHTML = `
+		<div class="question-container">
+			<div class="question-title">
+				<span class="icon">❓</span>
+				<span>Claude has questions for you</span>
+			</div>
+			${questionsHtml}
+			<div class="question-buttons">
+				<button class="btn primary" onclick="submitQuestionAnswers('${data.id}', ${questions.length})">Submit Answers</button>
+			</div>
+		</div>
+	`;
+
+	messagesDiv.appendChild(messageDiv);
+	scrollToBottomIfNeeded(messagesDiv, shouldScroll);
+}
+
+function submitQuestionAnswers(questionId, questionCount) {
+	const answers = {};
+
+	for (let i = 0; i < questionCount; i++) {
+		const questionKey = `q${i}`;
+		const inputs = document.querySelectorAll(`input[name="${questionId}_${questionKey}"]:checked`);
+
+		if (inputs.length > 0) {
+			// Collect all selected values
+			const values = Array.from(inputs).map(input => input.value);
+			answers[questionKey] = values.length === 1 ? values[0] : values.join(',');
+		}
+	}
+
+	// Send answers to extension
+	vscode.postMessage({
+		type: 'userQuestionResponse',
+		requestId: questionId,
+		answers: answers
+	});
+
+	// Hide the question UI
+	const questionDiv = document.getElementById(`question-${questionId}`);
+	if (questionDiv) {
+		questionDiv.style.opacity = '0.5';
+		questionDiv.style.pointerEvents = 'none';
+		const buttons = questionDiv.querySelector('.question-buttons');
+		if (buttons) buttons.style.display = 'none';
+	}
 }
 
 function isPermissionError(content) {

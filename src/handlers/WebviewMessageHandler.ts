@@ -23,6 +23,7 @@ export class WebviewMessageHandler {
 			onOpenFile: (filePath: string) => void;
 			onSelectImage: () => Promise<void>;
 			onPermissionResponse: (id: string, approved: boolean, alwaysAllow?: boolean) => void;
+			onUserQuestionResponse: (id: string, answers: Record<string, string>) => void;
 			onSaveInputText: (text: string) => void;
 			onDismissWSLAlert: () => void;
 			onSendPermissions: () => Promise<void>;
@@ -107,6 +108,13 @@ export class WebviewMessageHandler {
 					message.requestId,
 					message.approved,
 					message.alwaysAllow
+				);
+				break;
+
+			case 'userQuestionResponse':
+				this.callbacks.onUserQuestionResponse(
+					message.requestId,
+					message.answers
 				);
 				break;
 

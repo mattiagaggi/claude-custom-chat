@@ -194,8 +194,33 @@ function enableButtons() {
 }
 
 function toggleExpand(button) {
+	if (!button) return;
+
 	const container = button.parentElement;
+	if (!container) return;
+
+	// Check if this is an expand button with data attributes (from diff-formatting)
+	if (button.hasAttribute('data-value')) {
+		const isExpanded = button.classList.contains('expanded');
+		const key = button.getAttribute('data-key');
+		const value = button.getAttribute('data-value');
+
+		if (isExpanded) {
+			// Collapse - show truncated version
+			const truncated = value.substring(0, 97) + '...';
+			container.innerHTML = '<strong>' + key + ':</strong> ' + truncated + ' <span class="expand-btn" data-key="' + key + '" data-value="' + value + '" onclick="toggleExpand(this)">expand</span>';
+		} else {
+			// Expand - show full value
+			button.classList.add('expanded');
+			container.innerHTML = '<strong>' + key + ':</strong> ' + value + ' <span class="expand-btn expanded" data-key="' + key + '" data-value="' + value + '" onclick="toggleExpand(this)">collapse</span>';
+		}
+		return;
+	}
+
+	// Handle other expandable content (if any)
 	const content = container.querySelector('.expandable-content');
+	if (!content) return;
+
 	const isExpanded = button.classList.contains('expanded');
 
 	if (isExpanded) {

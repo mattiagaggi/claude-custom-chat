@@ -28,4 +28,4 @@ let subscriptionType = null;
 let requestStartTime = null;
 let requestTimer = null;
 let currentModel = 'Opus';
-let queuedMessage = null;
+let messageQueue = [];

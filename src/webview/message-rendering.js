@@ -112,19 +112,22 @@ function sendMessage() {
 	if (!message) return;
 
 	if (isProcessing) {
-		// Queue the message if Claude is still processing
-		queuedMessage = {
+		// Add message to queue if Claude is still processing
+		messageQueue.push({
 			content: message,
 			planMode: planModeEnabled,
 			thinkingMode: thinkingModeEnabled
-		};
+		});
 		messageInput.value = '';
 		adjustTextareaHeight();
 
 		// Show visual feedback that message is queued
 		const status = document.getElementById('statusText');
 		if (status) {
-			status.textContent = 'Message queued - will send when Claude finishes...';
+			const queueCount = messageQueue.length;
+			status.textContent = queueCount === 1
+				? 'Message queued - will send when Claude finishes...'
+				: `${queueCount} messages queued - will send when Claude finishes...`;
 		}
 	} else {
 		// Send immediately if not processing

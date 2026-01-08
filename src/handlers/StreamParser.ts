@@ -29,14 +29,17 @@ export class StreamParser {
 	 * Parse incoming chunk of data
 	 */
 	public parseChunk(chunk: string): void {
+		console.log('[StreamParser] Received chunk:', chunk.length, 'bytes');
 		this.buffer += chunk;
 		const lines = this.buffer.split('\n');
 
 		// Keep the last incomplete line in the buffer
 		this.buffer = lines.pop() || '';
+		console.log('[StreamParser] Processing', lines.length, 'complete lines, buffer has', this.buffer.length, 'bytes remaining');
 
 		for (const line of lines) {
 			if (line.trim()) {
+				console.log('[StreamParser] Processing line:', line.substring(0, 100));
 				this.processLine(line);
 			}
 		}
@@ -58,13 +61,17 @@ export class StreamParser {
 	 * Process parsed JSON data
 	 */
 	private processJsonData(data: any): void {
+		console.log('[StreamParser] Processing JSON data type:', data.type);
+
 		// Handle control messages
 		if (data.type === 'control_request') {
+			console.log('[StreamParser] Control request received');
 			this.callbacks.onControlRequest?.(data);
 			return;
 		}
 
 		if (data.type === 'control_response') {
+			console.log('[StreamParser] Control response received (echo from Claude)');
 			this.callbacks.onControlResponse?.(data);
 			return;
 		}
@@ -118,18 +125,25 @@ export class StreamParser {
 			}
 		} else if (data.type === 'result') {
 			// Final result with stats
+			console.log('[StreamParser] Result data:', JSON.stringify(data));
 			this.callbacks.onResult?.(data);
 
 			// Extract usage info
 			if (data.input_tokens && data.output_tokens) {
+				console.log('[StreamParser] Tokens found:', data.input_tokens, data.output_tokens);
 				this.callbacks.onTokenUsage?.(
 					data.input_tokens,
 					data.output_tokens
 				);
+			} else {
+				console.log('[StreamParser] No tokens in result data. Keys:', Object.keys(data));
 			}
 
 			if (data.total_cost_usd) {
+				console.log('[StreamParser] Cost found:', data.total_cost_usd);
 				this.callbacks.onCostUpdate?.(data.total_cost_usd);
+			} else {
+				console.log('[StreamParser] No cost in result data');
 			}
 
 			// Reset for next message
