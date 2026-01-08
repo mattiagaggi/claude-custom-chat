@@ -191,7 +191,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
+    "compile": "npm run copy-assets && npm run minify && tsc -p ./",
+    "copy-assets": "mkdir -p out/webview && cp src/webview/styles.css src/webview/*.js out/webview/",
+    "minify": "for f in out/webview/*.js; do terser \"$f\" -o \"$f\" -c -m; done && csso out/webview/styles.css -o out/webview/styles.css",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
@@ -206,7 +208,9 @@
     "@vscode/test-cli": "^0.0.10",
     "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.5.0",
+    "csso-cli": "^4.0.2",
     "eslint": "^9.25.1",
+    "terser": "^5.44.1",
     "typescript": "^5.8.3"
   }
 }

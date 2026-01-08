@@ -2,15 +2,15 @@ import getScript from './script';
 import styles from './ui-styles'
 
 
-const getHtml = (isTelemetryEnabled: boolean) => `<!DOCTYPE html>
+const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Claude Code Chat</title>
-	${styles}
+	${styleUri ? styles(styleUri) : '<!-- No CSS URI provided -->'}
 </head>
-<body>
+<body data-telemetry-enabled="${isTelemetryEnabled}">
 	<div class="header">
 		<div style="display: flex; align-items: center;">
 			<h2>Claude Code Chat</h2>
@@ -774,7 +774,23 @@ const getHtml = (isTelemetryEnabled: boolean) => `<!DOCTYPE html>
 		</div>
 	</div>
 
-	${getScript(isTelemetryEnabled)}
+	${scriptUri ? `
+		<script src="${scriptUri.replace('script.js', 'state.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'utils.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'markdown.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'ui-helpers.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'diff-formatting.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'message-rendering.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'tool-display.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'file-picker.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'session-management.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'permissions.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'mcp-servers.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'modals.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'message-handler.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'event-listeners.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'init.js')}"></script>
+	` : getScript(isTelemetryEnabled)}
 	
 	<!-- 
 	Analytics FAQ:
