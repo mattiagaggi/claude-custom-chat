@@ -38,6 +38,7 @@ export class WebviewMessageHandler {
 			onGetActiveConversations: () => void;
 			onSwitchConversation: (conversationId: string) => Promise<void>;
 			onCloseConversation: (conversationId: string) => Promise<void>;
+			onOpenConversationInNewPanel: (filename: string) => Promise<void>;
 		}
 	) {}
 
@@ -184,6 +185,10 @@ export class WebviewMessageHandler {
 
 			case 'closeConversation':
 				await this.callbacks.onCloseConversation(message.conversationId);
+				break;
+
+			case 'openConversationInNewPanel':
+				await this.callbacks.onOpenConversationInNewPanel(message.filename);
 				break;
 
 			case 'message':
