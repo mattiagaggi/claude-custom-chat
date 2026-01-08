@@ -406,5 +406,39 @@ window.addEventListener('message', event => {
 				updateStatusWithTotals();
 			}
 			break;
+
+		case 'activeConversationsList':
+			// Handle active conversations list from extension
+			handleActiveConversationsList(message.data);
+			break;
+
+		case 'conversationCreated':
+			// Add new conversation tab
+			addConversationTab(message.conversationId, message.title);
+			break;
+
+		case 'conversationSwitched':
+			// Update current active conversation
+			currentActiveConversationId = message.conversationId;
+			renderConversationTabs();
+			break;
+
+		case 'conversationUpdated':
+			// Update conversation metadata
+			if (message.title) {
+				updateConversationTitle(message.conversationId, message.title);
+			}
+			if (message.hasNewMessages !== undefined) {
+				const conversation = activeConversations.get(message.conversationId);
+				if (conversation) {
+					conversation.hasNewMessages = message.hasNewMessages;
+					conversation.newMessageCount = message.newMessageCount || 0;
+					renderConversationTabs();
+				}
+			}
+			if (message.isProcessing !== undefined) {
+				setConversationProcessing(message.conversationId, message.isProcessing);
+			}
+			break;
 	}
 });

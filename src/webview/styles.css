@@ -3339,3 +3339,102 @@
     gap: 8px;
     padding-top: 8px;
 }
+
+/* Active Conversation Tabs */
+.active-conversation-tabs {
+    background-color: var(--vscode-panel-background);
+    border-bottom: 1px solid var(--vscode-panel-border);
+    padding: 8px 12px 0 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.conversation-tabs-list {
+    display: flex;
+    gap: 4px;
+    min-height: 32px;
+}
+
+.conversation-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    max-width: 200px;
+    position: relative;
+}
+
+.conversation-tab:hover {
+    background-color: var(--vscode-list-hoverBackground);
+    color: var(--vscode-foreground);
+}
+
+.conversation-tab.active {
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-focusBorder);
+    font-weight: 500;
+}
+
+.conversation-tab-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.conversation-tab-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.conversation-tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.conversation-tab:hover .conversation-tab-close {
+    opacity: 0.7;
+}
+
+.conversation-tab-close:hover {
+    background-color: var(--vscode-list-hoverBackground);
+    opacity: 1;
+}
+
+.conversation-tab-processing {
+    width: 12px;
+    height: 12px;
+    border: 2px solid var(--vscode-progressBar-background);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

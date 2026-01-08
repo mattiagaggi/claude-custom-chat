@@ -1,0 +1,235 @@
+// Conversation tabs management
+
+// Track active conversations (indexed by conversation ID)
+let activeConversations = new Map();
+let currentActiveConversationId = null;
+
+/**
+ * Add a new conversation tab
+ */
+function addConversationTab(conversationId, title = 'New Chat') {
+	activeConversations.set(conversationId, {
+		id: conversationId,
+		title: title,
+		hasNewMessages: false,
+		newMessageCount: 0,
+		isProcessing: false
+	});
+
+	renderConversationTabs();
+}
+
+/**
+ * Remove a conversation tab
+ */
+function removeConversationTab(conversationId) {
+	activeConversations.delete(conversationId);
+	renderConversationTabs();
+
+	// If we closed the active conversation, switch to another one
+	if (currentActiveConversationId === conversationId) {
+		const remainingConversations = Array.from(activeConversations.keys());
+		if (remainingConversations.length > 0) {
+			switchToConversation(remainingConversations[0]);
+		} else {
+			currentActiveConversationId = null;
+		}
+	}
+}
+
+/**
+ * Switch to a specific conversation
+ */
+function switchToConversation(conversationId) {
+	if (!activeConversations.has(conversationId)) {
+		console.error('Cannot switch to conversation', conversationId, '- not found');
+		return;
+	}
+
+	// Clear new messages flag
+	const conversation = activeConversations.get(conversationId);
+	if (conversation) {
+		conversation.hasNewMessages = false;
+		conversation.newMessageCount = 0;
+	}
+
+	currentActiveConversationId = conversationId;
+	renderConversationTabs();
+
+	// Send message to extension to switch conversation
+	vscode.postMessage({
+		type: 'switchConversation',
+		conversationId: conversationId
+	});
+}
+
+/**
+ * Update conversation title
+ */
+function updateConversationTitle(conversationId, title) {
+	const conversation = activeConversations.get(conversationId);
+	if (conversation) {
+		conversation.title = title;
+		renderConversationTabs();
+	}
+}
+
+/**
+ * Mark conversation as having new messages
+ */
+function markConversationWithNewMessages(conversationId, increment = 1) {
+	const conversation = activeConversations.get(conversationId);
+	if (conversation && conversationId !== currentActiveConversationId) {
+		conversation.hasNewMessages = true;
+		conversation.newMessageCount += increment;
+		renderConversationTabs();
+	}
+}
+
+/**
+ * Set conversation processing state
+ */
+function setConversationProcessing(conversationId, isProcessing) {
+	const conversation = activeConversations.get(conversationId);
+	if (conversation) {
+		conversation.isProcessing = isProcessing;
+		renderConversationTabs();
+	}
+}
+
+/**
+ * Render all conversation tabs
+ */
+function renderConversationTabs() {
+	const tabsContainer = document.getElementById('activeConversationTabs');
+	const tabsList = document.getElementById('conversationTabsList');
+
+	if (!tabsContainer || !tabsList) {
+		return;
+	}
+
+	// Show/hide tabs container based on number of conversations
+	if (activeConversations.size > 1) {
+		tabsContainer.style.display = 'block';
+	} else {
+		tabsContainer.style.display = 'none';
+		return;
+	}
+
+	// Clear existing tabs
+	tabsList.innerHTML = '';
+
+	// Render each conversation tab
+	activeConversations.forEach((conversation, conversationId) => {
+		const tab = document.createElement('div');
+		tab.className = 'conversation-tab';
+		if (conversationId === currentActiveConversationId) {
+			tab.classList.add('active');
+		}
+
+		// Tab title
+		const title = document.createElement('span');
+		title.className = 'conversation-tab-title';
+		title.textContent = conversation.title;
+		tab.appendChild(title);
+
+		// Badge for new messages
+		if (conversation.hasNewMessages && conversation.newMessageCount > 0) {
+			const badge = document.createElement('span');
+			badge.className = 'conversation-tab-badge';
+			badge.textContent = conversation.newMessageCount;
+			tab.appendChild(badge);
+		}
+
+		// Processing indicator
+		if (conversation.isProcessing) {
+			const processingIndicator = document.createElement('div');
+			processingIndicator.className = 'conversation-tab-processing';
+			tab.appendChild(processingIndicator);
+		}
+
+		// Close button
+		const closeBtn = document.createElement('span');
+		closeBtn.className = 'conversation-tab-close';
+		closeBtn.innerHTML = '✕';
+		closeBtn.onclick = (e) => {
+			e.stopPropagation();
+			closeConversationTab(conversationId);
+		};
+		tab.appendChild(closeBtn);
+
+		// Click handler to switch conversation
+		tab.onclick = () => {
+			if (conversationId !== currentActiveConversationId) {
+				switchToConversation(conversationId);
+			}
+		};
+
+		tabsList.appendChild(tab);
+	});
+}
+
+/**
+ * Close a conversation tab with confirmation if it has unsaved changes
+ */
+function closeConversationTab(conversationId) {
+	const conversation = activeConversations.get(conversationId);
+	if (!conversation) {
+		return;
+	}
+
+	// If this is the only conversation, just create a new one instead of closing
+	if (activeConversations.size === 1) {
+		newSession();
+		return;
+	}
+
+	// Ask for confirmation if conversation is processing
+	if (conversation.isProcessing) {
+		if (!confirm('This conversation has an active process. Close anyway?')) {
+			return;
+		}
+	}
+
+	// Remove the tab
+	removeConversationTab(conversationId);
+
+	// Tell extension to close the conversation
+	vscode.postMessage({
+		type: 'closeConversation',
+		conversationId: conversationId
+	});
+}
+
+/**
+ * Initialize conversation tabs on page load
+ */
+function initializeConversationTabs() {
+	// Request active conversations from extension
+	vscode.postMessage({
+		type: 'getActiveConversations'
+	});
+}
+
+/**
+ * Handle active conversations list from extension
+ */
+function handleActiveConversationsList(conversations) {
+	activeConversations.clear();
+
+	conversations.forEach(conv => {
+		activeConversations.set(conv.id, {
+			id: conv.id,
+			title: conv.title || 'Chat',
+			hasNewMessages: conv.hasNewMessages || false,
+			newMessageCount: conv.newMessageCount || 0,
+			isProcessing: conv.isProcessing || false
+		});
+
+		if (conv.isActive) {
+			currentActiveConversationId = conv.id;
+		}
+	});
+
+	renderConversationTabs();
+}

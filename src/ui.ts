@@ -22,7 +22,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 			<button class="btn primary" id="newSessionBtn" onclick="newSession()">New Chat</button>
 		</div>
 	</div>
-	
+
 	<div id="conversationHistory" class="conversation-history" style="display: none;">
 		<div class="conversation-header">
 			<h3>Conversation History</h3>
@@ -30,6 +30,13 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		<div id="conversationList" class="conversation-list">
 			<!-- Conversations will be loaded here -->
+		</div>
+	</div>
+
+	<!-- Active Conversations Tabs -->
+	<div id="activeConversationTabs" class="active-conversation-tabs" style="display: none;">
+		<div id="conversationTabsList" class="conversation-tabs-list">
+			<!-- Active conversation tabs will be rendered here -->
 		</div>
 	</div>
 
@@ -784,6 +791,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		<script src="${scriptUri.replace('script.js', 'tool-display.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'file-picker.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'session-management.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'conversation-tabs.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'permissions.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'mcp-servers.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'modals.js')}"></script>

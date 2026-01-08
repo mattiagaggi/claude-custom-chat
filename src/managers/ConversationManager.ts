@@ -22,15 +22,25 @@ export interface ConversationIndex {
 	summary?: string;
 }
 
+interface ConversationState {
+	messages: Array<{ timestamp: string; messageType: string; data: any }>;
+	startTime: string;
+	sessionId: string | undefined;
+	totalCost: number;
+	totalTokensInput: number;
+	totalTokensOutput: number;
+	filename?: string;
+	isActive: boolean;
+	hasNewMessages: boolean;
+}
+
 export class ConversationManager {
 	private _conversationsPath: string | undefined;
-	private _currentConversation: Array<{ timestamp: string; messageType: string; data: any }> = [];
-	private _conversationStartTime: string | undefined;
 	private _conversationIndex: ConversationIndex[] = [];
-	private _currentSessionId: string | undefined;
-	private _totalCost: number = 0;
-	private _totalTokensInput: number = 0;
-	private _totalTokensOutput: number = 0;
+
+	// Support multiple active conversations
+	private _conversations: Map<string, ConversationState> = new Map();
+	private _activeConversationId: string | undefined;
 
 	constructor(private readonly _context: vscode.ExtensionContext) {
 		// Set path synchronously
@@ -39,6 +49,26 @@ export class ConversationManager {
 
 		// Do async initialization
 		this._initialize();
+
+		// Start with a default conversation
+		this._activeConversationId = this._generateConversationId();
+		this._conversations.set(this._activeConversationId, {
+			messages: [],
+			startTime: new Date().toISOString(),
+			sessionId: undefined,
+			totalCost: 0,
+			totalTokensInput: 0,
+			totalTokensOutput: 0,
+			isActive: true,
+			hasNewMessages: false
+		});
+	}
+
+	/**
+	 * Generate a unique conversation ID
+	 */
+	private _generateConversationId(): string {
+		return `conv-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 	}
 
 	/**
@@ -68,64 +98,154 @@ export class ConversationManager {
 	}
 
 	/**
-	 * Start a new conversation
+	 * Create a new conversation
 	 */
-	public startConversation(sessionId?: string): void {
-		this._currentConversation = [];
-		this._conversationStartTime = new Date().toISOString();
-		this._currentSessionId = sessionId;
-		this._totalCost = 0;
-		this._totalTokensInput = 0;
-		this._totalTokensOutput = 0;
+	public createConversation(sessionId?: string): string {
+		const conversationId = this._generateConversationId();
+		this._conversations.set(conversationId, {
+			messages: [],
+			startTime: new Date().toISOString(),
+			sessionId,
+			totalCost: 0,
+			totalTokensInput: 0,
+			totalTokensOutput: 0,
+			isActive: true,
+			hasNewMessages: false
+		});
+		return conversationId;
 	}
 
 	/**
-	 * Add message to current conversation
+	 * Start a new conversation (replaces current active)
 	 */
-	public addMessage(messageType: string, data: any): void {
-		this._currentConversation.push({
+	public startConversation(sessionId?: string): void {
+		// Save current conversation if it has messages
+		const current = this.getActiveConversation();
+		if (current && current.messages.length > 0) {
+			this.saveConversation();
+		}
+
+		// Create and activate new conversation
+		const conversationId = this.createConversation(sessionId);
+		this._activeConversationId = conversationId;
+	}
+
+	/**
+	 * Switch to a different conversation
+	 */
+	public switchConversation(conversationId: string): boolean {
+		if (!this._conversations.has(conversationId)) {
+			return false;
+		}
+
+		// Mark previous as inactive
+		if (this._activeConversationId) {
+			const prev = this._conversations.get(this._activeConversationId);
+			if (prev) {
+				prev.isActive = false;
+				prev.hasNewMessages = false; // Clear badge when switching to it
+			}
+		}
+
+		// Activate new conversation
+		this._activeConversationId = conversationId;
+		const conv = this._conversations.get(conversationId);
+		if (conv) {
+			conv.isActive = true;
+			conv.hasNewMessages = false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Get active conversation
+	 */
+	public getActiveConversation(): ConversationState | undefined {
+		if (!this._activeConversationId) return undefined;
+		return this._conversations.get(this._activeConversationId);
+	}
+
+	/**
+	 * Get conversation by ID
+	 */
+	public getConversation(conversationId: string): ConversationState | undefined {
+		return this._conversations.get(conversationId);
+	}
+
+	/**
+	 * Get all active conversation IDs
+	 */
+	public getActiveConversationIds(): string[] {
+		return Array.from(this._conversations.keys());
+	}
+
+	/**
+	 * Add message to specific conversation (or active if not specified)
+	 */
+	public addMessage(messageType: string, data: any, conversationId?: string): void {
+		const targetId = conversationId || this._activeConversationId;
+		if (!targetId) return;
+
+		const conversation = this._conversations.get(targetId);
+		if (!conversation) return;
+
+		conversation.messages.push({
 			timestamp: new Date().toISOString(),
 			messageType,
 			data
 		});
+
+		// Mark as having new messages if it's not the active conversation
+		if (targetId !== this._activeConversationId) {
+			conversation.hasNewMessages = true;
+		}
 	}
 
 	/**
-	 * Update usage statistics
+	 * Update usage statistics for specific conversation (or active if not specified)
 	 */
-	public updateUsage(cost: number, inputTokens: number, outputTokens: number): void {
-		this._totalCost += cost;
-		this._totalTokensInput += inputTokens;
-		this._totalTokensOutput += outputTokens;
+	public updateUsage(cost: number, inputTokens: number, outputTokens: number, conversationId?: string): void {
+		const targetId = conversationId || this._activeConversationId;
+		if (!targetId) return;
+
+		const conversation = this._conversations.get(targetId);
+		if (!conversation) return;
+
+		conversation.totalCost += cost;
+		conversation.totalTokensInput += inputTokens;
+		conversation.totalTokensOutput += outputTokens;
 	}
 
 	/**
-	 * Save current conversation to file
+	 * Save specific conversation to file (or active if not specified)
 	 */
-	public async saveConversation(): Promise<void> {
-		if (!this._conversationsPath || this._currentConversation.length === 0) {
+	public async saveConversation(conversationId?: string): Promise<void> {
+		const targetId = conversationId || this._activeConversationId;
+		if (!targetId || !this._conversationsPath) {
 			return;
 		}
 
-		const filename = `conversation-${Date.now()}.json`;
+		const conversation = this._conversations.get(targetId);
+		if (!conversation || conversation.messages.length === 0) {
+			return;
+		}
+
+		// Use existing filename or generate new one
+		const filename = conversation.filename || `conversation-${Date.now()}.json`;
 		const filepath = path.join(this._conversationsPath, filename);
 
-		// Use conversation start time, or first message timestamp, or current time
-		const startTime = this._conversationStartTime
-			|| this._currentConversation[0]?.timestamp
-			|| new Date().toISOString();
-
 		const conversationData: ConversationData = {
-			sessionId: this._currentSessionId || '',
-			startTime: startTime,
+			sessionId: conversation.sessionId || '',
+			startTime: conversation.startTime,
 			endTime: new Date().toISOString(),
-			messageCount: this._currentConversation.length,
-			totalCost: this._totalCost,
+			messageCount: conversation.messages.length,
+			totalCost: conversation.totalCost,
 			totalTokens: {
-				input: this._totalTokensInput,
-				output: this._totalTokensOutput
+				input: conversation.totalTokensInput,
+				output: conversation.totalTokensOutput
 			},
-			messages: this._currentConversation,
+			messages: conversation.messages,
 			filename
 		};
 
@@ -133,18 +253,31 @@ export class ConversationManager {
 			const fs = require('fs').promises;
 			await fs.writeFile(filepath, JSON.stringify(conversationData, null, 2));
 
+			// Store filename in conversation state
+			conversation.filename = filename;
+
 			// Update index
-			this._updateIndex(filename, conversationData);
+			this._updateIndex(filename, conversationData, conversation);
 		} catch (error: any) {
 			console.error('Failed to save conversation:', error.message);
 		}
 	}
 
 	/**
+	 * Save all active conversations
+	 */
+	public async saveAllConversations(): Promise<void> {
+		const savePromises = Array.from(this._conversations.keys()).map(id =>
+			this.saveConversation(id)
+		);
+		await Promise.all(savePromises);
+	}
+
+	/**
 	 * Generate a summary from conversation messages
 	 */
-	private _generateSummary(): string {
-		const userMessages = this._currentConversation.filter(m => m.messageType === 'userInput');
+	private _generateSummary(messages: Array<{ timestamp: string; messageType: string; data: any }>): string {
+		const userMessages = messages.filter((m: any) => m.messageType === 'userInput');
 
 		if (userMessages.length === 0) {
 			return 'New conversation';
@@ -183,14 +316,14 @@ export class ConversationManager {
 	/**
 	 * Update conversation index
 	 */
-	private _updateIndex(filename: string, conversationData: ConversationData): void {
+	private _updateIndex(filename: string, conversationData: ConversationData, conversation: ConversationState): void {
 		// Find first and last user messages
-		const userMessages = this._currentConversation.filter(m => m.messageType === 'userInput');
+		const userMessages = conversation.messages.filter((m: any) => m.messageType === 'userInput');
 		const firstUserMessage = userMessages[0]?.data || 'No messages';
 		const lastUserMessage = userMessages[userMessages.length - 1]?.data || firstUserMessage;
 
 		// Generate summary
-		const summary = this._generateSummary();
+		const summary = this._generateSummary(conversation.messages);
 
 		// Update or add to index
 		const existingIndex = this._conversationIndex.findIndex(c => c.filename === filename);
@@ -234,7 +367,7 @@ export class ConversationManager {
 	}
 
 	/**
-	 * Load a conversation from file
+	 * Load a conversation from file into a new conversation slot
 	 */
 	public async loadConversation(filename: string): Promise<ConversationData | undefined> {
 		// Validate filename
@@ -260,13 +393,26 @@ export class ConversationManager {
 			const data = await fs.readFile(filepath, 'utf8');
 			const conversationData: ConversationData = JSON.parse(data);
 
-			// Restore state
-			this._currentConversation = conversationData.messages;
-			this._conversationStartTime = conversationData.startTime;
-			this._currentSessionId = conversationData.sessionId;
-			this._totalCost = conversationData.totalCost;
-			this._totalTokensInput = conversationData.totalTokens.input;
-			this._totalTokensOutput = conversationData.totalTokens.output;
+			// Create new conversation from loaded data
+			const conversationId = this._generateConversationId();
+			this._conversations.set(conversationId, {
+				messages: conversationData.messages,
+				startTime: conversationData.startTime,
+				sessionId: conversationData.sessionId || undefined,
+				totalCost: conversationData.totalCost,
+				totalTokensInput: conversationData.totalTokens.input,
+				totalTokensOutput: conversationData.totalTokens.output,
+				filename: filename,
+				isActive: true,
+				hasNewMessages: false
+			});
+
+			// Switch to this conversation
+			if (this._activeConversationId) {
+				const prev = this._conversations.get(this._activeConversationId);
+				if (prev) prev.isActive = false;
+			}
+			this._activeConversationId = conversationId;
 
 			return conversationData;
 		} catch (error: any) {
@@ -300,20 +446,45 @@ export class ConversationManager {
 	 * Get current session info
 	 */
 	public getCurrentSession() {
+		const conversation = this.getActiveConversation();
+		if (!conversation) {
+			return {
+				sessionId: undefined,
+				messageCount: 0,
+				totalCost: 0,
+				totalTokensInput: 0,
+				totalTokensOutput: 0,
+				startTime: undefined
+			};
+		}
+
 		return {
-			sessionId: this._currentSessionId,
-			messageCount: this._currentConversation.length,
-			totalCost: this._totalCost,
-			totalTokensInput: this._totalTokensInput,
-			totalTokensOutput: this._totalTokensOutput,
-			startTime: this._conversationStartTime
+			sessionId: conversation.sessionId,
+			messageCount: conversation.messages.length,
+			totalCost: conversation.totalCost,
+			totalTokensInput: conversation.totalTokensInput,
+			totalTokensOutput: conversation.totalTokensOutput,
+			startTime: conversation.startTime
 		};
 	}
 
 	/**
-	 * Set current session ID
+	 * Set session ID for specific conversation (or active if not specified)
 	 */
-	public setSessionId(sessionId: string): void {
-		this._currentSessionId = sessionId;
+	public setSessionId(sessionId: string, conversationId?: string): void {
+		const targetId = conversationId || this._activeConversationId;
+		if (!targetId) return;
+
+		const conversation = this._conversations.get(targetId);
+		if (!conversation) return;
+
+		conversation.sessionId = sessionId;
+	}
+
+	/**
+	 * Get active conversation ID
+	 */
+	public getActiveConversationId(): string | undefined {
+		return this._activeConversationId;
 	}
 }

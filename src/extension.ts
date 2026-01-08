@@ -122,6 +122,9 @@ class ClaudeChatProvider {
 	private pendingPermissions = new Map<string, any>();
 	private chatNumber: number;
 
+	// Conversation state
+	private currentConversationId: string | undefined;
+
 	constructor(
 		private readonly extensionUri: vscode.Uri,
 		private readonly context: vscode.ExtensionContext,
@@ -139,6 +142,9 @@ class ClaudeChatProvider {
 
 		// Load saved state
 		this.selectedModel = context.workspaceState.get('claude.selectedModel', 'default');
+
+		// Set initial conversation ID from conversation manager
+		this.currentConversationId = this.conversationManager.getActiveConversationId();
 	}
 
 	/**
@@ -280,7 +286,10 @@ class ClaudeChatProvider {
 			onDeleteMCPServer: (name: string) => this.deleteMCPServer(name),
 			onSendCustomSnippets: () => this.sendCustomSnippets(),
 			onSaveCustomSnippet: (snippet: any) => this.saveCustomSnippet(snippet),
-			onDeleteCustomSnippet: (snippetId: string) => this.deleteCustomSnippet(snippetId)
+			onDeleteCustomSnippet: (snippetId: string) => this.deleteCustomSnippet(snippetId),
+			onGetActiveConversations: () => this.sendActiveConversations(),
+			onSwitchConversation: (conversationId: string) => this.switchConversation(conversationId),
+			onCloseConversation: (conversationId: string) => this.closeConversation(conversationId)
 		};
 	}
 
@@ -290,22 +299,22 @@ class ClaudeChatProvider {
 	private createStreamCallbacks() {
 		return {
 			onSessionStart: (sessionId: string) => {
-				this.conversationManager.setSessionId(sessionId);
+				this.conversationManager.setSessionId(sessionId, this.currentConversationId);
 			},
 			onToolUse: (data: any) => {
-				this.sendAndSaveMessage({ type: 'toolUse', data });
+				this.sendAndSaveMessage({ type: 'toolUse', data }, this.currentConversationId);
 			},
 			onToolResult: (data: any) => {
-				this.sendAndSaveMessage({ type: 'toolResult', data });
+				this.sendAndSaveMessage({ type: 'toolResult', data }, this.currentConversationId);
 			},
 			onTextDelta: (text: string) => {
 				this.postMessage({ type: 'textDelta', data: text });
 			},
 			onMessage: (content: string) => {
-				this.sendAndSaveMessage({ type: 'assistantMessage', data: content });
+				this.sendAndSaveMessage({ type: 'assistantMessage', data: content }, this.currentConversationId);
 			},
 			onTokenUsage: (inputTokens: number, outputTokens: number) => {
-				this.conversationManager.updateUsage(0, inputTokens, outputTokens);
+				this.conversationManager.updateUsage(0, inputTokens, outputTokens, this.currentConversationId);
 
 				// Send updated usage to UI
 				const session = this.conversationManager.getCurrentSession();
@@ -319,7 +328,7 @@ class ClaudeChatProvider {
 				});
 			},
 			onCostUpdate: (cost: number) => {
-				this.conversationManager.updateUsage(cost, 0, 0);
+				this.conversationManager.updateUsage(cost, 0, 0, this.currentConversationId);
 
 				// Send updated cost to UI
 				const session = this.conversationManager.getCurrentSession();
@@ -347,7 +356,7 @@ class ClaudeChatProvider {
 					console.log('[Extension] Result usage data:', { inputTokens, outputTokens, cost });
 
 					// Update conversation manager
-					this.conversationManager.updateUsage(cost, inputTokens, outputTokens);
+					this.conversationManager.updateUsage(cost, inputTokens, outputTokens, this.currentConversationId);
 
 					// Send to UI
 					const session = this.conversationManager.getCurrentSession();
@@ -363,14 +372,14 @@ class ClaudeChatProvider {
 				}
 
 				// Auto-save conversation after each response
-				await this.conversationManager.saveConversation();
+				await this.conversationManager.saveConversation(this.currentConversationId);
 
 				// Refresh conversation list to update timestamps
 				const conversations = this.conversationManager.getConversationList();
 				this.postMessage({ type: 'conversationList', data: conversations });
 			},
 			onError: (error: string) => {
-				this.sendAndSaveMessage({ type: 'error', data: error });
+				this.sendAndSaveMessage({ type: 'error', data: error }, this.currentConversationId);
 			},
 			onAccountInfo: (info: any) => {
 				if (info.subscription_type) {
@@ -469,7 +478,7 @@ class ClaudeChatProvider {
 		this.postMessage({ type: 'loading', data: 'Claude is working...' });
 
 		try {
-			// Spawn process
+			// Spawn process with conversation ID
 			const process = await this.processManager.spawn({
 				args,
 				cwd,
@@ -477,7 +486,7 @@ class ClaudeChatProvider {
 				wslDistro: config.get('wsl.distro', 'Ubuntu'),
 				nodePath: config.get('wsl.nodePath', '/usr/bin/node'),
 				claudePath: config.get('wsl.claudePath', '/usr/local/bin/claude')
-			});
+			}, this.currentConversationId);
 
 			this.currentProcess = process;
 
@@ -723,6 +732,10 @@ class ClaudeChatProvider {
 		await this.conversationManager.saveConversation();
 
 		this.conversationManager.startConversation();
+
+		// Update current conversation ID
+		this.currentConversationId = this.conversationManager.getActiveConversationId();
+
 		this.postMessage({ type: 'sessionCleared' });
 		this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
 
@@ -752,6 +765,9 @@ class ClaudeChatProvider {
 		console.log('[Extension] Conversation loaded:', conversation ? 'success' : 'failed');
 
 		if (conversation) {
+			// Update current conversation ID
+			this.currentConversationId = this.conversationManager.getActiveConversationId();
+
 			console.log('[Extension] Sending conversationLoaded message with', conversation.messages?.length || 0, 'messages');
 			// Send conversation data to webview
 			this.postMessage({ type: 'conversationLoaded', data: conversation });
@@ -780,9 +796,10 @@ class ClaudeChatProvider {
 	/**
 	 * Send and save message
 	 */
-	private sendAndSaveMessage(message: { type: string; data: any }) {
+	private sendAndSaveMessage(message: { type: string; data: any }, conversationId?: string) {
 		this.postMessage(message);
-		this.conversationManager.addMessage(message.type, message.data);
+		const targetId = conversationId || this.currentConversationId;
+		this.conversationManager.addMessage(message.type, message.data, targetId);
 	}
 
 	/**
@@ -1092,6 +1109,135 @@ class ClaudeChatProvider {
 		const homeDir = require('os').homedir();
 		const storagePath = path.join(homeDir, '.claude');
 		return path.join(storagePath, 'mcp', 'mcp-servers.json');
+	}
+
+	/**
+	 * Send active conversations list to webview
+	 */
+	private sendActiveConversations() {
+		const conversationIds = this.conversationManager.getActiveConversationIds();
+		const activeConversations = conversationIds.map(id => {
+			const conversation = this.conversationManager.getConversation(id);
+			if (!conversation) {
+				return null;
+			}
+
+			// Generate title from first user message
+			const userMessages = conversation.messages.filter((m: any) => m.messageType === 'userInput');
+			const title = userMessages.length > 0
+				? userMessages[0].data.substring(0, 30) + (userMessages[0].data.length > 30 ? '...' : '')
+				: 'New Chat';
+
+			return {
+				id,
+				title,
+				isActive: id === this.currentConversationId,
+				hasNewMessages: conversation.hasNewMessages,
+				newMessageCount: conversation.messages.filter((m: any) =>
+					m.messageType !== 'userInput' && conversation.hasNewMessages
+				).length,
+				isProcessing: this.isProcessing && id === this.currentConversationId
+			};
+		}).filter(c => c !== null);
+
+		this.postMessage({
+			type: 'activeConversationsList',
+			data: activeConversations
+		});
+	}
+
+	/**
+	 * Switch to a different conversation
+	 */
+	private async switchConversation(conversationId: string) {
+		// Don't switch if already active
+		if (conversationId === this.currentConversationId) {
+			return;
+		}
+
+		// Save current conversation
+		await this.conversationManager.saveConversation(this.currentConversationId);
+
+		// Switch conversation in manager
+		const success = this.conversationManager.switchConversation(conversationId);
+		if (!success) {
+			console.error('Failed to switch to conversation:', conversationId);
+			return;
+		}
+
+		// Update current conversation ID
+		this.currentConversationId = conversationId;
+
+		// Load conversation data and send to webview
+		const conversation = this.conversationManager.getConversation(conversationId);
+		if (!conversation) {
+			console.error('Conversation not found after switch:', conversationId);
+			return;
+		}
+
+		// Send conversation loaded message
+		this.postMessage({
+			type: 'conversationLoaded',
+			data: {
+				messages: conversation.messages,
+				sessionId: conversation.sessionId,
+				startTime: conversation.startTime,
+				totalCost: conversation.totalCost,
+				totalTokens: {
+					input: conversation.totalTokensInput,
+					output: conversation.totalTokensOutput
+				}
+			}
+		});
+
+		// Update session info
+		const session = this.conversationManager.getCurrentSession();
+		this.postMessage({
+			type: 'sessionInfo',
+			data: {
+				sessionId: session.sessionId,
+				totalTokensInput: session.totalTokensInput,
+				totalTokensOutput: session.totalTokensOutput,
+				totalCost: session.totalCost,
+				requestCount: session.messageCount
+			}
+		});
+
+		// Notify webview of switch
+		this.postMessage({
+			type: 'conversationSwitched',
+			conversationId: conversationId
+		});
+	}
+
+	/**
+	 * Close a conversation
+	 */
+	private async closeConversation(conversationId: string) {
+		// Save before closing
+		await this.conversationManager.saveConversation(conversationId);
+
+		// Terminate any process for this conversation
+		if (this.processManager.isConversationRunning(conversationId)) {
+			await this.processManager.terminateConversation(conversationId);
+		}
+
+		// If closing the active conversation, switch to another or create new
+		if (conversationId === this.currentConversationId) {
+			const otherConversations = this.conversationManager.getActiveConversationIds()
+				.filter(id => id !== conversationId);
+
+			if (otherConversations.length > 0) {
+				await this.switchConversation(otherConversations[0]);
+			} else {
+				// Create a new conversation
+				await this.newSession();
+			}
+		}
+
+		// Remove from active conversations (implementation depends on how you want to manage this)
+		// For now, we'll just notify the UI
+		this.sendActiveConversations();
 	}
 
 	async dispose() {

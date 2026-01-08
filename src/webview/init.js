@@ -10,5 +10,8 @@ vscode.postMessage({ type: 'getCustomSnippets' });
 // Request platform info for WSL alert
 vscode.postMessage({ type: 'getPlatformInfo' });
 
+// Initialize conversation tabs
+initializeConversationTabs();
+
 // Set initial state
 updateStatus('Initializing...', 'disconnected');

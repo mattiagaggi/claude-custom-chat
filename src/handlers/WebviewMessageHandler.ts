@@ -35,6 +35,9 @@ export class WebviewMessageHandler {
 			onSendCustomSnippets: () => Promise<void>;
 			onSaveCustomSnippet: (snippet: any) => Promise<void>;
 			onDeleteCustomSnippet: (snippetId: string) => Promise<void>;
+			onGetActiveConversations: () => void;
+			onSwitchConversation: (conversationId: string) => Promise<void>;
+			onCloseConversation: (conversationId: string) => Promise<void>;
 		}
 	) {}
 
@@ -169,6 +172,18 @@ export class WebviewMessageHandler {
 
 			case 'deleteCustomSnippet':
 				await this.callbacks.onDeleteCustomSnippet(message.snippetId);
+				break;
+
+			case 'getActiveConversations':
+				this.callbacks.onGetActiveConversations();
+				break;
+
+			case 'switchConversation':
+				await this.callbacks.onSwitchConversation(message.conversationId);
+				break;
+
+			case 'closeConversation':
+				await this.callbacks.onCloseConversation(message.conversationId);
 				break;
 
 			case 'message':
