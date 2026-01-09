@@ -367,6 +367,45 @@ export class ConversationManager {
 	}
 
 	/**
+	 * Prune old conversations, keeping only the most recent maxConversations
+	 */
+	public async pruneOldConversations(maxConversations: number = 100): Promise<number> {
+		if (!this._conversationsPath || this._conversationIndex.length <= maxConversations) {
+			return 0;
+		}
+
+		// Sort by end time (most recent first)
+		const sorted = [...this._conversationIndex].sort((a, b) => {
+			const timeA = a.endTime || a.startTime;
+			const timeB = b.endTime || b.startTime;
+			return new Date(timeB).getTime() - new Date(timeA).getTime();
+		});
+
+		// Get conversations to delete (oldest ones beyond the limit)
+		const toDelete = sorted.slice(maxConversations);
+		let deletedCount = 0;
+
+		const fs = require('fs').promises;
+		for (const conv of toDelete) {
+			try {
+				const filepath = path.join(this._conversationsPath, conv.filename);
+				await fs.unlink(filepath);
+				deletedCount++;
+				console.log(`[ConversationManager] Deleted old conversation: ${conv.filename}`);
+			} catch (error: any) {
+				console.error(`[ConversationManager] Failed to delete ${conv.filename}:`, error.message);
+			}
+		}
+
+		// Update index to only keep the recent conversations
+		this._conversationIndex = sorted.slice(0, maxConversations);
+		await this._saveIndex();
+
+		console.log(`[ConversationManager] Pruned ${deletedCount} old conversations, keeping ${maxConversations}`);
+		return deletedCount;
+	}
+
+	/**
 	 * Load a conversation from file into a new conversation slot
 	 */
 	public async loadConversation(filename: string): Promise<ConversationData | undefined> {

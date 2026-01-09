@@ -139,10 +139,8 @@ export class StreamParser {
 			console.log('[StreamParser] Result data:', JSON.stringify(data));
 			this.callbacks.onResult?.(data);
 
-			// Extract and display the result text if present
-			if (data.result && typeof data.result === 'string' && data.result.trim()) {
-				this.callbacks.onMessage?.(data.result);
-			}
+			// Note: Don't display result.result text here - it's already shown via the assistant message
+			// The result message is just for stats (tokens, cost, etc.)
 
 			// Extract usage info - can be at top level or in usage object
 			const inputTokens = data.input_tokens || data.usage?.input_tokens || 0;

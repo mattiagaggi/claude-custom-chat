@@ -349,13 +349,16 @@ class ClaudeChatProvider {
 				this.isProcessing = false;
 
 				// Extract and send usage info from result
-				if (data.input_tokens || data.output_tokens || data.total_cost_usd) {
-					const inputTokens = data.input_tokens || 0;
-					const outputTokens = data.output_tokens || 0;
-					const cost = data.total_cost_usd || 0;
+				// Usage can be at top level or in nested usage object
+				const usage = data.usage || {};
+				const inputTokens = data.input_tokens || usage.input_tokens || 0;
+				const outputTokens = data.output_tokens || usage.output_tokens || 0;
+				const cacheReadTokens = usage.cache_read_input_tokens || 0;
+				const cost = data.total_cost_usd || 0;
 
-					console.log('[Extension] Result usage data:', { inputTokens, outputTokens, cost });
+				console.log('[Extension] Result usage data:', { inputTokens, outputTokens, cacheReadTokens, cost });
 
+				if (inputTokens || outputTokens || cost) {
 					// Update conversation manager
 					this.conversationManager.updateUsage(cost, inputTokens, outputTokens, this.currentConversationId);
 
@@ -761,6 +764,9 @@ class ClaudeChatProvider {
 
 		// Save current conversation before starting new one
 		await this.conversationManager.saveConversation();
+
+		// Prune old conversations (keep max 100)
+		await this.conversationManager.pruneOldConversations(100);
 
 		this.conversationManager.startConversation();
 
