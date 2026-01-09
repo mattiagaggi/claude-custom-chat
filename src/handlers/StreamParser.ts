@@ -24,6 +24,8 @@ export class StreamParser {
 	private currentStreamingMessageId: string | null = null;
 	// Track tool IDs to tool names for mapping tool_result to toolName
 	private toolIdToName: Map<string, string> = new Map();
+	// Track if we've already sent a message for this turn (to avoid duplicates from result.result)
+	private messageSentThisTurn: boolean = false;
 
 	constructor(private callbacks: StreamCallbacks) {}
 
@@ -165,9 +167,11 @@ export class StreamParser {
 			if (this.currentMessageContent) {
 				this.callbacks.onMessage?.(this.currentMessageContent);
 				this.currentMessageContent = '';
+				this.messageSentThisTurn = true;
 			} else if (assistantTextContent) {
 				// No streaming text was accumulated - use text from content array
 				this.callbacks.onMessage?.(assistantTextContent);
+				this.messageSentThisTurn = true;
 			}
 
 			// Extract usage from assistant message
@@ -186,6 +190,7 @@ export class StreamParser {
 			if (this.currentMessageContent) {
 				this.callbacks.onMessage?.(this.currentMessageContent);
 				this.currentMessageContent = '';
+				this.messageSentThisTurn = true;
 			}
 		} else if (data.type === 'result') {
 			// Final result with stats
@@ -195,15 +200,19 @@ export class StreamParser {
 			if (this.currentMessageContent) {
 				this.callbacks.onMessage?.(this.currentMessageContent);
 				this.currentMessageContent = '';
+				this.messageSentThisTurn = true;
 			}
-			// If no streaming text was accumulated but result contains text,
+			// If no message was sent this turn and result contains text,
 			// this means the response wasn't streamed - display it now
-			else if (data.result && typeof data.result === 'string') {
+			// (avoid duplicates if assistant message already sent the text)
+			else if (!this.messageSentThisTurn && data.result && typeof data.result === 'string') {
 				console.log('[StreamParser] Result contains non-streamed text, displaying');
 				this.callbacks.onMessage?.(data.result);
 			}
 
 			this.callbacks.onResult?.(data);
+			// Reset the flag for the next turn
+			this.messageSentThisTurn = false;
 
 			// Extract usage info - can be at top level or in usage object
 			const inputTokens = data.input_tokens || data.usage?.input_tokens || 0;
@@ -238,6 +247,7 @@ export class StreamParser {
 		this.currentMessageContent = '';
 		this.currentStreamingMessageId = null;
 		this.toolIdToName.clear();
+		this.messageSentThisTurn = false;
 	}
 
 	/**

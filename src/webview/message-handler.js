@@ -1,5 +1,28 @@
 // Window message event handler - handles all messages from VS Code extension
 
+// Track which conversation is currently being viewed in this webview
+let currentViewedConversationId = null;
+
+/**
+ * Check if a message is for the currently viewed conversation.
+ * Returns true if:
+ * - Message has no conversationId (global message)
+ * - Message's conversationId matches current viewed conversation
+ * - No conversation is currently being viewed (initial state)
+ */
+function isMessageForCurrentConversation(message) {
+	// Messages without conversationId are global/system messages - always display
+	if (!message.conversationId) {
+		return true;
+	}
+	// If no conversation is being viewed yet, accept all messages
+	if (!currentViewedConversationId) {
+		return true;
+	}
+	// Only display messages for the currently viewed conversation
+	return message.conversationId === currentViewedConversationId;
+}
+
 window.addEventListener('message', event => {
 	const message = event.data;
 
@@ -67,7 +90,8 @@ window.addEventListener('message', event => {
 
 		case 'textDelta':
 			// Handle streaming text delta - accumulate full text and re-render
-			if (message.data) {
+			// Only process if this is for the currently viewed conversation
+			if (message.data && isMessageForCurrentConversation(message)) {
 				// Initialize streaming state if needed
 				if (!window.streamingState) {
 					window.streamingState = {
@@ -142,7 +166,8 @@ window.addEventListener('message', event => {
 
 		case 'finalizeStreaming':
 			// Finalize any pending streaming message with complete content
-			if (window.streamingState) {
+			// Only process if for current conversation
+			if (isMessageForCurrentConversation(message) && window.streamingState) {
 				if (window.streamingState.timeout) {
 					clearTimeout(window.streamingState.timeout);
 				}
@@ -162,83 +187,96 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'setProcessing':
-			isProcessing = message.data.isProcessing;
-			if (isProcessing) {
-				startRequestTimer(message.data.requestStartTime);
-				showStopButton();
-				disableButtons();
-				showProcessingIndicator();
-			} else {
-				isExecutingTool = false; // Reset tool execution state
-				stopRequestTimer();
-				hideStopButton();
-				enableButtons();
-				hideProcessingIndicator();
+			// Only update processing state if for current conversation
+			if (isMessageForCurrentConversation(message)) {
+				isProcessing = message.data.isProcessing;
+				if (isProcessing) {
+					startRequestTimer(message.data.requestStartTime);
+					showStopButton();
+					disableButtons();
+					showProcessingIndicator();
+				} else {
+					isExecutingTool = false; // Reset tool execution state
+					stopRequestTimer();
+					hideStopButton();
+					enableButtons();
+					hideProcessingIndicator();
 
-				// Flush any remaining streaming state and do final render
-				if (window.streamingState) {
-					if (window.streamingState.timeout) {
-						clearTimeout(window.streamingState.timeout);
+					// Flush any remaining streaming state and do final render
+					if (window.streamingState) {
+						if (window.streamingState.timeout) {
+							clearTimeout(window.streamingState.timeout);
+						}
+						// Do final render with complete text
+						if (window.streamingState.fullText) {
+							const parsedContent = parseSimpleMarkdown(window.streamingState.fullText);
+							replaceStreamingMessageContent(parsedContent);
+						}
+						// Reset streaming state for next message
+						window.streamingState = null;
 					}
-					// Do final render with complete text
-					if (window.streamingState.fullText) {
-						const parsedContent = parseSimpleMarkdown(window.streamingState.fullText);
-						replaceStreamingMessageContent(parsedContent);
+					// Clear streaming message ID so next message creates a fresh element
+					currentStreamingMessageId = null;
+
+					// Send next queued message if any exist
+					if (messageQueue.length > 0) {
+						const queued = messageQueue.shift(); // Remove and get first message
+
+						// Send the queued message (don't show in UI - already shown when queued)
+						vscode.postMessage({
+							type: 'message',
+							content: queued.content,
+							planMode: queued.planMode,
+							thinkingMode: queued.thinkingMode,
+							skipUIDisplay: true // Tell extension not to add to UI again
+						});
 					}
-					// Reset streaming state for next message
-					window.streamingState = null;
 				}
-				// Clear streaming message ID so next message creates a fresh element
-				currentStreamingMessageId = null;
-
-				// Send next queued message if any exist
-				if (messageQueue.length > 0) {
-					const queued = messageQueue.shift(); // Remove and get first message
-
-					// Send the queued message (don't show in UI - already shown when queued)
-					vscode.postMessage({
-						type: 'message',
-						content: queued.content,
-						planMode: queued.planMode,
-						thinkingMode: queued.thinkingMode,
-						skipUIDisplay: true // Tell extension not to add to UI again
-					});
-				}
+				updateStatusWithTotals();
 			}
-			updateStatusWithTotals();
 			break;
 
 		case 'clearLoading':
-			if (messagesDiv.children.length > 0) {
-				const lastMessage = messagesDiv.children[messagesDiv.children.length - 1];
-				if (lastMessage.classList.contains('system')) {
-					lastMessage.remove();
+			// Only clear loading if for current conversation
+			if (isMessageForCurrentConversation(message)) {
+				if (messagesDiv.children.length > 0) {
+					const lastMessage = messagesDiv.children[messagesDiv.children.length - 1];
+					if (lastMessage.classList.contains('system')) {
+						lastMessage.remove();
+					}
 				}
+				updateStatusWithTotals();
 			}
-			updateStatusWithTotals();
 			break;
 
 		case 'error':
-			if (message.data.trim()) {
+			// Only display error if for current conversation
+			if (isMessageForCurrentConversation(message) && message.data.trim()) {
 				if (message.data.includes('Claude Code is not installed')) {
 					showInstallModal();
 				} else {
 					addMessage(message.data, 'error');
 				}
+				updateStatusWithTotals();
 			}
-			updateStatusWithTotals();
 			break;
 
 		case 'toolUse':
-			isExecutingTool = true;
-			addToolUseMessage(message.data);
-			updateStatusWithTotals();
+			// Only display if for current conversation
+			if (isMessageForCurrentConversation(message)) {
+				isExecutingTool = true;
+				addToolUseMessage(message.data);
+				updateStatusWithTotals();
+			}
 			break;
 
 		case 'toolResult':
-			isExecutingTool = false;
-			addToolResultMessage(message.data);
-			updateStatusWithTotals();
+			// Only display if for current conversation
+			if (isMessageForCurrentConversation(message)) {
+				isExecutingTool = false;
+				addToolResultMessage(message.data);
+				updateStatusWithTotals();
+			}
 			break;
 
 		case 'thinking':
@@ -420,12 +458,19 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'sessionCleared': {
+			// Update the currently viewed conversation ID
+			if (message.conversationId) {
+				currentViewedConversationId = message.conversationId;
+				console.log('[sessionCleared] Set currentViewedConversationId:', currentViewedConversationId);
+			}
+
 			// Clear the messages display
 			const messagesDiv = document.getElementById('messages');
 			messagesDiv.innerHTML = '';
 
 			// Reset state
 			currentStreamingMessageId = null;
+			window.streamingState = null; // Reset streaming state
 			messageQueue.length = 0; // Clear any queued messages
 
 			// Show ready message
@@ -436,6 +481,12 @@ window.addEventListener('message', event => {
 
 		case 'conversationLoaded': {
 			console.log('[conversationLoaded] Received conversationLoaded event');
+
+			// Update the currently viewed conversation ID
+			if (message.data && message.data.conversationId) {
+				currentViewedConversationId = message.data.conversationId;
+				console.log('[conversationLoaded] Set currentViewedConversationId:', currentViewedConversationId);
+			}
 
 			// DON'T clear processing state here - it will be set by setProcessing message if needed
 			// The extension sends setProcessing after conversationLoaded if the conversation is processing
@@ -510,7 +561,8 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'usage':
-			if (message.data) {
+			// Only update usage if for current conversation
+			if (isMessageForCurrentConversation(message) && message.data) {
 				console.log('[usage] Received usage data:', message.data);
 				totalTokensInput = message.data.inputTokens || 0;
 				totalTokensOutput = message.data.outputTokens || 0;
@@ -532,8 +584,11 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'conversationSwitched':
-			// Update current active conversation
+			// Update current active conversation (for tabs UI)
 			currentActiveConversationId = message.conversationId;
+			// Also update the viewed conversation ID (for message filtering)
+			currentViewedConversationId = message.conversationId;
+			console.log('[conversationSwitched] Set currentViewedConversationId:', currentViewedConversationId);
 			renderConversationTabs();
 			break;
 

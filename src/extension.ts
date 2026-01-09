@@ -317,6 +317,9 @@ class ClaudeChatProvider {
 
 	/**
 	 * Create stream parser callbacks
+	 *
+	 * Architecture: Backend operates independently - always saves messages and sends to UI with conversationId.
+	 * The webview decides what to display based on which conversation is currently being viewed.
 	 */
 	private createStreamCallbacks() {
 		return {
@@ -324,18 +327,24 @@ class ClaudeChatProvider {
 				this.conversationManager.setSessionId(sessionId, this.processingConversationId);
 			},
 			onToolUse: (data: any) => {
-				// Send to UI only if this is the currently viewed conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'toolUse', data });
-				}
+				// Always save to conversation
 				this.conversationManager.addMessage('toolUse', data, this.processingConversationId);
+				// Always send to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'toolUse',
+					data,
+					conversationId: this.processingConversationId
+				});
 			},
 			onToolResult: (data: any) => {
-				// Send to UI only if this is the currently viewed conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'toolResult', data });
-				}
+				// Always save to conversation
 				this.conversationManager.addMessage('toolResult', data, this.processingConversationId);
+				// Always send to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'toolResult',
+					data,
+					conversationId: this.processingConversationId
+				});
 			},
 			onTextDelta: (text: string) => {
 				// Accumulate streaming text for the processing conversation
@@ -343,67 +352,82 @@ class ClaudeChatProvider {
 				const currentText = this.conversationStreamingText.get(convId) || '';
 				this.conversationStreamingText.set(convId, currentText + text);
 
-				// Send to UI only if this is the currently viewed conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'textDelta', data: text });
-				}
+				// Always send to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'textDelta',
+					data: text,
+					conversationId: this.processingConversationId
+				});
 			},
 			onMessage: (content: string) => {
 				// Clear streaming text for this conversation - message is complete
 				const convId = this.processingConversationId || '';
 				this.conversationStreamingText.delete(convId);
 
-				// Send to UI only if this is the currently viewed conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'finalizeStreaming', data: content });
-				}
+				// Always save to conversation
 				this.conversationManager.addMessage('assistantMessage', content, this.processingConversationId);
+				// Always send to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'finalizeStreaming',
+					data: content,
+					conversationId: this.processingConversationId
+				});
 			},
 			onTokenUsage: (inputTokens: number, outputTokens: number) => {
 				this.conversationManager.updateUsage(0, inputTokens, outputTokens, this.processingConversationId);
 
-				// Send updated usage to UI only if viewing the processing conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					const session = this.conversationManager.getCurrentSession();
-					this.postMessage({
-						type: 'usage',
-						data: {
-							inputTokens: session.totalTokensInput,
-							outputTokens: session.totalTokensOutput,
-							totalCost: session.totalCost
-						}
-					});
-				}
+				// Always send usage to UI with conversationId - UI will filter
+				const conversation = this.processingConversationId
+					? this.conversationManager.getConversation(this.processingConversationId)
+					: null;
+				this.postMessage({
+					type: 'usage',
+					data: {
+						inputTokens: conversation?.totalTokensInput || 0,
+						outputTokens: conversation?.totalTokensOutput || 0,
+						totalCost: conversation?.totalCost || 0
+					},
+					conversationId: this.processingConversationId
+				});
 			},
 			onCostUpdate: (cost: number) => {
 				this.conversationManager.updateUsage(cost, 0, 0, this.processingConversationId);
 
-				// Send updated cost to UI only if viewing the processing conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					const session = this.conversationManager.getCurrentSession();
-					this.postMessage({
-						type: 'usage',
-						data: {
-							inputTokens: session.totalTokensInput,
-							outputTokens: session.totalTokensOutput,
-							totalCost: session.totalCost
-						}
-					});
-				}
+				// Always send cost to UI with conversationId - UI will filter
+				const conversation = this.processingConversationId
+					? this.conversationManager.getConversation(this.processingConversationId)
+					: null;
+				this.postMessage({
+					type: 'usage',
+					data: {
+						inputTokens: conversation?.totalTokensInput || 0,
+						outputTokens: conversation?.totalTokensOutput || 0,
+						totalCost: conversation?.totalCost || 0
+					},
+					conversationId: this.processingConversationId
+				});
 			},
 			onResult: async (data: any) => {
-				const isViewingProcessingConv = this.processingConversationId === this.currentConversationId;
+				const processingConvId = this.processingConversationId;
 
-				if (isViewingProcessingConv) {
-					this.postMessage({ type: 'result', data });
-					this.postMessage({ type: 'clearLoading' });
-				}
+				// Always send result to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'result',
+					data,
+					conversationId: processingConvId
+				});
+				this.postMessage({
+					type: 'clearLoading',
+					conversationId: processingConvId
+				});
 
 				// Set processing to false when we get a final result (success or error)
 				if (data.subtype === 'success' || data.subtype?.startsWith('error')) {
-					if (isViewingProcessingConv) {
-						this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
-					}
+					this.postMessage({
+						type: 'setProcessing',
+						data: { isProcessing: false },
+						conversationId: processingConvId
+					});
 					this.isProcessing = false;
 					this.processingConversationId = undefined;
 				}
@@ -420,36 +444,40 @@ class ClaudeChatProvider {
 
 				if (inputTokens || outputTokens || cost) {
 					// Update conversation manager for the processing conversation
-					this.conversationManager.updateUsage(cost, inputTokens, outputTokens, this.processingConversationId);
+					this.conversationManager.updateUsage(cost, inputTokens, outputTokens, processingConvId);
 
-					// Send to UI only if viewing the processing conversation
-					if (isViewingProcessingConv) {
-						const session = this.conversationManager.getCurrentSession();
-						console.log('[Extension] Sending usage to UI:', session);
-						this.postMessage({
-							type: 'usage',
-							data: {
-								inputTokens: session.totalTokensInput,
-								outputTokens: session.totalTokensOutput,
-								totalCost: session.totalCost
-							}
-						});
-					}
+					// Always send to UI with conversationId - UI will filter
+					const conversation = processingConvId
+						? this.conversationManager.getConversation(processingConvId)
+						: null;
+					console.log('[Extension] Sending usage to UI:', conversation);
+					this.postMessage({
+						type: 'usage',
+						data: {
+							inputTokens: conversation?.totalTokensInput || 0,
+							outputTokens: conversation?.totalTokensOutput || 0,
+							totalCost: conversation?.totalCost || 0
+						},
+						conversationId: processingConvId
+					});
 				}
 
 				// Auto-save the processing conversation after each response
-				await this.conversationManager.saveConversation(this.processingConversationId);
+				await this.conversationManager.saveConversation(processingConvId);
 
 				// Refresh conversation list to update timestamps
 				const conversations = this.conversationManager.getConversationList();
 				this.postMessage({ type: 'conversationList', data: conversations });
 			},
 			onError: (error: string) => {
-				// Send to UI only if viewing the processing conversation
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'error', data: error });
-				}
+				// Always save to conversation
 				this.conversationManager.addMessage('error', error, this.processingConversationId);
+				// Always send to UI with conversationId - UI will filter
+				this.postMessage({
+					type: 'error',
+					data: error,
+					conversationId: this.processingConversationId
+				});
 			},
 			onAccountInfo: (info: any) => {
 				if (info.subscription_type) {
@@ -840,21 +868,24 @@ class ClaudeChatProvider {
 	 * Stop current process
 	 */
 	private async stopProcess() {
+		const stoppedConvId = this.processingConversationId;
 		await this.processManager.terminate();
 		this.currentProcess = undefined;
 		this.isProcessing = false;
 		// Finalize any streaming content before clearing
-		if (this.processingConversationId) {
-			const streamingText = this.conversationStreamingText.get(this.processingConversationId);
+		if (stoppedConvId) {
+			const streamingText = this.conversationStreamingText.get(stoppedConvId);
 			if (streamingText) {
 				// Save the partial streaming content as a completed message
-				this.conversationManager.addMessage('assistantMessage', streamingText, this.processingConversationId);
-				// Notify UI to finalize the streaming display
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'finalizeStreaming', data: streamingText });
-				}
+				this.conversationManager.addMessage('assistantMessage', streamingText, stoppedConvId);
+				// Notify UI to finalize the streaming display (UI will filter by conversationId)
+				this.postMessage({
+					type: 'finalizeStreaming',
+					data: streamingText,
+					conversationId: stoppedConvId
+				});
 			}
-			this.conversationStreamingText.delete(this.processingConversationId);
+			this.conversationStreamingText.delete(stoppedConvId);
 		}
 		this.processingConversationId = undefined;
 		this.permissionManager.cancelAllPending();
@@ -863,9 +894,12 @@ class ClaudeChatProvider {
 
 	/**
 	 * Start new session
+	 * Note: Does NOT stop the current process - it continues running in the background
+	 * for the previous conversation. The user can switch back to it later.
 	 */
 	async newSession() {
-		await this.stopProcess();
+		// DON'T stop the process - let it continue in background for the previous conversation
+		// await this.stopProcess();
 
 		// Save current conversation before starting new one
 		await this.conversationManager.saveConversation();
@@ -875,10 +909,14 @@ class ClaudeChatProvider {
 
 		this.conversationManager.startConversation();
 
-		// Update current conversation ID
+		// Update current conversation ID (this is what the user is now viewing)
 		this.currentConversationId = this.conversationManager.getActiveConversationId();
 
-		this.postMessage({ type: 'sessionCleared' });
+		this.postMessage({
+			type: 'sessionCleared',
+			conversationId: this.currentConversationId
+		});
+		// The new conversation is not processing (the old one might still be)
 		this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
 
 		// Refresh conversation history
@@ -914,6 +952,7 @@ class ClaudeChatProvider {
 				this.postMessage({
 					type: 'conversationLoaded',
 					data: {
+						conversationId: this.processingConversationId,
 						messages: processingConv.messages,
 						sessionId: processingConv.sessionId,
 						startTime: processingConv.startTime,
@@ -927,7 +966,8 @@ class ClaudeChatProvider {
 				});
 				this.postMessage({
 					type: 'setProcessing',
-					data: { isProcessing: true, requestStartTime: Date.now() }
+					data: { isProcessing: true, requestStartTime: Date.now() },
+					conversationId: this.processingConversationId
 				});
 
 				// Refresh conversation history
@@ -946,8 +986,14 @@ class ClaudeChatProvider {
 			this.currentConversationId = this.conversationManager.getActiveConversationId();
 
 			console.log('[Extension] Sending conversationLoaded message with', conversation.messages?.length || 0, 'messages');
-			// Send conversation data to webview
-			this.postMessage({ type: 'conversationLoaded', data: conversation });
+			// Send conversation data to webview with conversationId included
+			this.postMessage({
+				type: 'conversationLoaded',
+				data: {
+					...conversation,
+					conversationId: this.currentConversationId
+				}
+			});
 
 			// This is a non-processing conversation, so clear processing state in UI
 			this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
@@ -1368,10 +1414,15 @@ class ClaudeChatProvider {
 			return;
 		}
 
-		// Send conversation loaded message
+		// Check if this conversation is currently processing
+		const isProcessingConv = conversationId === this.processingConversationId && this.isProcessing;
+		const streamingText = isProcessingConv ? this.conversationStreamingText.get(conversationId) : null;
+
+		// Send conversation loaded message (include streaming text if processing)
 		this.postMessage({
 			type: 'conversationLoaded',
 			data: {
+				conversationId: conversationId,
 				messages: conversation.messages,
 				sessionId: conversation.sessionId,
 				startTime: conversation.startTime,
@@ -1379,7 +1430,8 @@ class ClaudeChatProvider {
 				totalTokens: {
 					input: conversation.totalTokensInput,
 					output: conversation.totalTokensOutput
-				}
+				},
+				streamingText: streamingText || null
 			}
 		});
 
@@ -1396,15 +1448,12 @@ class ClaudeChatProvider {
 			}
 		});
 
-		// If this conversation is currently processing, replay streaming state
-		if (conversationId === this.processingConversationId && this.isProcessing) {
-			const streamingText = this.conversationStreamingText.get(conversationId);
-			if (streamingText) {
-				this.postMessage({ type: 'streamingReplay', data: streamingText });
-			}
+		// If this conversation is currently processing, set processing state
+		if (isProcessingConv) {
 			this.postMessage({
 				type: 'setProcessing',
-				data: { isProcessing: true, requestStartTime: Date.now() }
+				data: { isProcessing: true, requestStartTime: Date.now() },
+				conversationId: conversationId
 			});
 		}
 
