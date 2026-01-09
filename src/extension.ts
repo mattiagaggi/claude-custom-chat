@@ -843,8 +843,17 @@ class ClaudeChatProvider {
 		await this.processManager.terminate();
 		this.currentProcess = undefined;
 		this.isProcessing = false;
-		// Clear streaming state for the processing conversation
+		// Finalize any streaming content before clearing
 		if (this.processingConversationId) {
+			const streamingText = this.conversationStreamingText.get(this.processingConversationId);
+			if (streamingText) {
+				// Save the partial streaming content as a completed message
+				this.conversationManager.addMessage('assistantMessage', streamingText, this.processingConversationId);
+				// Notify UI to finalize the streaming display
+				if (this.processingConversationId === this.currentConversationId) {
+					this.postMessage({ type: 'finalizeStreaming', data: streamingText });
+				}
+			}
 			this.conversationStreamingText.delete(this.processingConversationId);
 		}
 		this.processingConversationId = undefined;

@@ -22,6 +22,8 @@ export class StreamParser {
 	private buffer: string = '';
 	private currentMessageContent: string = '';
 	private currentStreamingMessageId: string | null = null;
+	// Track tool IDs to tool names for mapping tool_result to toolName
+	private toolIdToName: Map<string, string> = new Map();
 
 	constructor(private callbacks: StreamCallbacks) {}
 
@@ -90,9 +92,28 @@ export class StreamParser {
 
 		// Handle different content types
 		if (data.type === 'tool_use') {
-			this.callbacks.onToolUse?.(data);
+			// Normalize tool_use data format to match expected UI structure
+			const toolData = {
+				toolName: data.name,
+				toolInfo: data.name,
+				rawInput: data.input,
+				id: data.id
+			};
+			// Track tool ID to name mapping for tool_result
+			if (data.id && data.name) {
+				this.toolIdToName.set(data.id, data.name);
+			}
+			this.callbacks.onToolUse?.(toolData);
 		} else if (data.type === 'tool_result') {
-			this.callbacks.onToolResult?.(data);
+			// Normalize tool_result data format to match expected UI structure
+			const toolName = this.toolIdToName.get(data.tool_use_id) || 'Unknown';
+			const toolResultData = {
+				toolName: toolName,
+				content: data.content,
+				isError: data.is_error || false,
+				tool_use_id: data.tool_use_id
+			};
+			this.callbacks.onToolResult?.(toolResultData);
 		} else if (data.type === 'stream_event') {
 			// Handle streaming events from --include-partial-messages
 			const event = data.event;
@@ -127,6 +148,10 @@ export class StreamParser {
 							rawInput: contentItem.input,
 							id: contentItem.id
 						};
+						// Track tool ID to name mapping for tool_result
+						if (contentItem.id && contentItem.name) {
+							this.toolIdToName.set(contentItem.id, contentItem.name);
+						}
 						this.callbacks.onToolUse?.(toolData);
 					} else if (contentItem.type === 'text' && contentItem.text) {
 						// Collect text from content array (used when not streaming)
@@ -212,6 +237,7 @@ export class StreamParser {
 		this.buffer = '';
 		this.currentMessageContent = '';
 		this.currentStreamingMessageId = null;
+		this.toolIdToName.clear();
 	}
 
 	/**

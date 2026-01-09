@@ -100,7 +100,12 @@ window.addEventListener('message', event => {
 								addMessage(parsedContent, 'claude');
 							} else {
 								// Replace content in existing message
-								replaceStreamingMessageContent(parsedContent);
+								// If replace fails (message not found), create a new one
+								if (!replaceStreamingMessageContent(parsedContent)) {
+									// Message with matching ID not found - create new one
+									currentStreamingMessageId = window.streamingState.messageId;
+									addMessage(parsedContent, 'claude');
+								}
 							}
 						}
 					}, 50);
