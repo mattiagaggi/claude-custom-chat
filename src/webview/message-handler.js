@@ -230,6 +230,8 @@ window.addEventListener('message', event => {
 							thinkingMode: queued.thinkingMode,
 							skipUIDisplay: true // Tell extension not to add to UI again
 						});
+						// Increment request count for queued message
+						requestCount = (requestCount || 0) + 1;
 					}
 				}
 				updateStatusWithTotals();
@@ -473,6 +475,12 @@ window.addEventListener('message', event => {
 			window.streamingState = null; // Reset streaming state
 			messageQueue.length = 0; // Clear any queued messages
 
+			// Reset usage counters for new conversation
+			totalTokensInput = 0;
+			totalTokensOutput = 0;
+			totalCost = 0;
+			requestCount = 0;
+
 			// Show ready message
 			addMessage('New chat started. Ready for your message!', 'system');
 			updateStatusWithTotals();
@@ -561,15 +569,22 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'usage':
+			console.log('[usage] Received message:', message, 'currentViewedConversationId:', currentViewedConversationId);
 			// Only update usage if for current conversation
 			if (isMessageForCurrentConversation(message) && message.data) {
-				console.log('[usage] Received usage data:', message.data);
+				console.log('[usage] Processing usage data:', message.data);
 				totalTokensInput = message.data.inputTokens || 0;
 				totalTokensOutput = message.data.outputTokens || 0;
 				totalCost = message.data.totalCost || 0;
-				requestCount = (requestCount || 0) + 1;
+				// Only set requestCount if explicitly provided (e.g., initial load or conversation switch)
+				// Don't increment on streaming updates - requestCount is incremented when user sends a message
+				if (message.data.requestCount !== undefined) {
+					requestCount = message.data.requestCount;
+				}
 				console.log('[usage] Updated totals:', { totalTokensInput, totalTokensOutput, totalCost, requestCount });
 				updateStatusWithTotals();
+			} else {
+				console.log('[usage] Skipped - not for current conversation or no data');
 			}
 			break;
 

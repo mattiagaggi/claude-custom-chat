@@ -664,6 +664,13 @@ class ClaudeChatProvider {
 		this.sendConversationList();
 		this.sendSettings();
 		this.sendPlatformInfo();
+		// Send current conversation ID so webview knows which conversation is active
+		if (this.currentConversationId) {
+			this.postMessage({
+				type: 'conversationSwitched',
+				conversationId: this.currentConversationId
+			});
+		}
 		this.sendCurrentUsage();
 	}
 
@@ -676,12 +683,19 @@ class ClaudeChatProvider {
 			: null;
 
 		if (conversation) {
+			// Count messages to get request count (user messages = requests)
+			const requestCount = conversation.messages?.filter(
+				(m: any) => m.messageType === 'userInput'
+			).length || 0;
+
 			this.postMessage({
 				type: 'usage',
 				data: {
 					inputTokens: conversation.totalTokensInput || 0,
 					outputTokens: conversation.totalTokensOutput || 0,
-					totalCost: conversation.totalCost || 0
+					totalCost: conversation.totalCost || 0,
+					requestCount: requestCount,
+					isInitialLoad: true
 				},
 				conversationId: this.currentConversationId
 			});

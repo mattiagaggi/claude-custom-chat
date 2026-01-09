@@ -47,10 +47,8 @@ function viewUsage(usageType) {
 
 function updateStatusWithTotals() {
 	if (isProcessing) {
-		// While processing, show tokens and elapsed time
-		const totalTokens = totalTokensInput + totalTokensOutput;
-		const tokensStr = totalTokens > 0 ?
-			`${totalTokens.toLocaleString()} tokens` : '0 tokens';
+		// While processing, show input/output tokens and elapsed time
+		const tokensStr = formatTokensStr(totalTokensInput, totalTokensOutput);
 
 		let elapsedStr = '';
 		if (requestStartTime) {
@@ -77,14 +75,29 @@ function updateStatusWithTotals() {
 			const costStr = totalCost > 0 ? `$${totalCost.toFixed(4)}` : '$0.00';
 			usageStr = `<a href="#" onclick="event.preventDefault(); viewUsage('api');" class="usage-badge" title="View usage">${costStr}${usageIcon}</a>`;
 		}
-		const totalTokens = totalTokensInput + totalTokensOutput;
-		const tokensStr = totalTokens > 0 ?
-			`${totalTokens.toLocaleString()} tokens` : '0 tokens';
+		const tokensStr = formatTokensStr(totalTokensInput, totalTokensOutput);
 		const requestStr = requestCount > 0 ? `${requestCount} requests` : '';
 
 		const statusText = `Ready • ${tokensStr}${requestStr ? ` • ${requestStr}` : ''} • ${usageStr}`;
 		updateStatusHtml(statusText, 'ready');
 	}
+}
+
+/**
+ * Format token counts for display
+ * Shows input↑ output↓ format for clarity on billing
+ */
+function formatTokensStr(input, output) {
+	if (input === 0 && output === 0) {
+		return '0 tokens';
+	}
+	// Format: "12.3k↑ 4.5k↓" for input/output
+	const formatNum = (n) => {
+		if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+		if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+		return n.toString();
+	};
+	return `${formatNum(input)}↑ ${formatNum(output)}↓`;
 }
 
 function startRequestTimer(startTime = undefined) {

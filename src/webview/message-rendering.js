@@ -184,6 +184,9 @@ function sendMessage() {
 		});
 		messageInput.value = '';
 		adjustTextareaHeight();
+		// Increment request count when user sends a message
+		requestCount = (requestCount || 0) + 1;
+		updateStatusWithTotals();
 	}
 }
 

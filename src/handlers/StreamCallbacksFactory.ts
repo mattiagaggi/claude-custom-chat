@@ -146,16 +146,6 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 				conversationId: processingConvId
 			});
 
-			// Set processing to false when we get a final result (success or error)
-			if (data.subtype === 'success' || data.subtype?.startsWith('error')) {
-				postMessage({
-					type: 'setProcessing',
-					data: { isProcessing: false },
-					conversationId: processingConvId
-				});
-				setProcessingState(false);
-			}
-
 			// Extract and send usage info from result
 			// Usage can be at top level or in nested usage object
 			const usage = data.usage || {};
@@ -164,7 +154,7 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			const cacheReadTokens = usage.cache_read_input_tokens || 0;
 			const cost = data.total_cost_usd || 0;
 
-			console.log('[Extension] Result usage data:', { inputTokens, outputTokens, cacheReadTokens, cost });
+			console.log('[Extension] Result usage data: inputTokens=' + inputTokens + ' outputTokens=' + outputTokens + ' cost=' + cost + ' processingConvId=' + processingConvId);
 
 			if (inputTokens || outputTokens || cost) {
 				// Update conversation manager for the processing conversation
@@ -174,7 +164,7 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 				const conversation = processingConvId
 					? conversationManager.getConversation(processingConvId)
 					: null;
-				console.log('[Extension] Sending usage to UI:', conversation);
+				console.log('[Extension] Sending usage to UI: processingConvId=' + processingConvId + ' conversationExists=' + !!conversation + ' totalTokensInput=' + conversation?.totalTokensInput + ' totalTokensOutput=' + conversation?.totalTokensOutput + ' totalCost=' + conversation?.totalCost);
 				postMessage({
 					type: 'usage',
 					data: {
@@ -192,6 +182,17 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			// Refresh conversation list to update timestamps
 			const conversations = conversationManager.getConversationList();
 			postMessage({ type: 'conversationList', data: conversations });
+
+			// Set processing to false AFTER all usage handling is complete
+			// This ensures onTokenUsage/onCostUpdate callbacks can still access processingConvId
+			if (data.subtype === 'success' || data.subtype?.startsWith('error')) {
+				postMessage({
+					type: 'setProcessing',
+					data: { isProcessing: false },
+					conversationId: processingConvId
+				});
+				setProcessingState(false);
+			}
 		},
 
 		onError: (error: string) => {
