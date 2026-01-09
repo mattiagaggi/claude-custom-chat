@@ -183,6 +183,8 @@ window.addEventListener('message', event => {
 					// Reset streaming state for next message
 					window.streamingState = null;
 				}
+				// Clear streaming message ID so next message creates a fresh element
+				currentStreamingMessageId = null;
 
 				// Send next queued message if any exist
 				if (messageQueue.length > 0) {
