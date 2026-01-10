@@ -1,9 +1,12 @@
 /**
- * ConversationManager - Handles conversation persistence and indexing
- * Responsibilities:
- * - Storing conversation messages
- * - Managing conversation index
- * - Loading/saving conversation history
+ * ConversationManager.ts - Conversation Persistence & History
+ *
+ * Manages conversation state and persistence:
+ * - Stores messages in memory (Map of conversation ID -> state)
+ * - Persists conversations to ~/.claude/conversations/ as JSON files
+ * - Maintains an index file for fast conversation list retrieval
+ * - Tracks usage statistics (tokens, cost) per conversation
+ * - Supports multiple simultaneous conversations
  */
 
 import * as vscode from 'vscode';
@@ -320,7 +323,12 @@ export class ConversationManager {
 		// Find first and last user messages
 		const userMessages = conversation.messages.filter((m: any) => m.messageType === 'userInput');
 		const firstUserMessage = userMessages[0]?.data || 'No messages';
-		const lastUserMessage = userMessages[userMessages.length - 1]?.data || firstUserMessage;
+		const lastUserMessageObj = userMessages[userMessages.length - 1];
+		const lastUserMessage = lastUserMessageObj?.data || firstUserMessage;
+
+		// Use the timestamp of the last user message for sorting (most recently typed)
+		// Fall back to endTime if no user messages
+		const lastInteractionTime = lastUserMessageObj?.timestamp || conversationData.endTime;
 
 		// Generate summary
 		const summary = this._generateSummary(conversation.messages);
@@ -331,7 +339,7 @@ export class ConversationManager {
 			filename,
 			sessionId: conversationData.sessionId || '',
 			startTime: conversationData.startTime || '',
-			endTime: conversationData.endTime,
+			endTime: lastInteractionTime, // Use last user interaction time for sorting
 			messageCount: conversationData.messageCount,
 			totalCost: conversationData.totalCost,
 			firstUserMessage: firstUserMessage.substring(0, 100),
@@ -433,14 +441,21 @@ export class ConversationManager {
 			const conversationData: ConversationData = JSON.parse(data);
 
 			// Create new conversation from loaded data
+			// Handle older conversation files that may not have totalTokens
+			const totalTokens = conversationData.totalTokens || { input: 0, output: 0 };
+			console.log('[ConversationManager] loadConversation file data:', {
+				totalTokens: conversationData.totalTokens,
+				totalCost: conversationData.totalCost,
+				resolvedTokens: totalTokens
+			});
 			const conversationId = this._generateConversationId();
 			this._conversations.set(conversationId, {
 				messages: conversationData.messages,
 				startTime: conversationData.startTime || new Date().toISOString(),
 				sessionId: conversationData.sessionId ? conversationData.sessionId : undefined,
-				totalCost: conversationData.totalCost,
-				totalTokensInput: conversationData.totalTokens.input,
-				totalTokensOutput: conversationData.totalTokens.output,
+				totalCost: conversationData.totalCost || 0,
+				totalTokensInput: totalTokens.input || 0,
+				totalTokensOutput: totalTokens.output || 0,
 				filename: filename,
 				isActive: true,
 				hasNewMessages: false
@@ -525,5 +540,27 @@ export class ConversationManager {
 	 */
 	public getActiveConversationId(): string | undefined {
 		return this._activeConversationId;
+	}
+
+	/**
+	 * Get filename for a conversation ID
+	 */
+	public getFilenameForConversation(conversationId: string | undefined): string | undefined {
+		if (!conversationId) return undefined;
+		const conversation = this._conversations.get(conversationId);
+		return conversation?.filename;
+	}
+
+	/**
+	 * Get conversation ID for a filename (reverse lookup)
+	 */
+	public getConversationIdForFilename(filename: string | undefined): string | undefined {
+		if (!filename) return undefined;
+		for (const [id, conversation] of this._conversations) {
+			if (conversation.filename === filename) {
+				return id;
+			}
+		}
+		return undefined;
 	}
 }

@@ -1,5 +1,8 @@
 /**
- * Central export for all manager classes
+ * managers/index.ts - Central Exports for Managers
+ *
+ * Re-exports all manager classes for convenient importing.
+ * Import from './managers' instead of individual files.
  */
 
 export * from './ProcessManager';

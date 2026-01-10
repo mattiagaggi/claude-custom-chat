@@ -1,4 +1,10 @@
-// Permission handling functions
+/**
+ * permissions.js - Permission Dialog UI
+ *
+ * Renders and manages permission request dialogs.
+ * Handles: displaying tool permission prompts, approve/deny buttons,
+ * "always allow" checkbox, and sending responses back to extension.
+ */
 
 function addPermissionRequestMessage(data) {
 	console.log('[addPermissionRequestMessage] Received permission request:', data);

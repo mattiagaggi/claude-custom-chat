@@ -1,9 +1,11 @@
 /**
- * PermissionManager - Handles permission requests and responses
- * Responsibilities:
- * - Tracking pending permission requests
- * - Matching commands against permission patterns
- * - Managing always-allow permissions
+ * PermissionManager.ts - Permission Rules & Auto-Approval
+ *
+ * Manages permission rules for tool execution:
+ * - Stores "always allow" patterns in ~/.claude/permissions.json
+ * - Checks incoming tool requests against saved patterns
+ * - Supports glob patterns for flexible command matching
+ * - Tracks pending permission requests awaiting user response
  */
 
 import * as vscode from 'vscode';

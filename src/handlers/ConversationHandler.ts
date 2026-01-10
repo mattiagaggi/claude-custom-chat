@@ -1,5 +1,10 @@
 /**
- * ConversationHandler - Manages conversation switching, loading, and active conversation tracking
+ * ConversationHandler.ts - Conversation Switching & Loading
+ *
+ * Manages switching between conversations, loading from history files,
+ * and tracking which conversation is currently active vs processing.
+ * Handles the logic for resuming processing conversations and sending
+ * conversation state to the webview.
  */
 
 import { ConversationManager, ProcessManager } from '../managers';
@@ -60,6 +65,25 @@ export class ConversationHandler {
 	}
 
 	/**
+	 * Send conversation list with processing state
+	 */
+	private sendConversationList() {
+		const { conversationManager, postMessage, getCurrentConversationId, getProcessingConversationId, isProcessing } = this.config;
+		const conversations = conversationManager.getConversationList();
+		// Show green dot if: conversation is processing OR is the current active conversation
+		const conversationsWithState = conversations.map(conv => {
+			const convId = conversationManager.getConversationIdForFilename(conv.filename);
+			const isActiveConversation = convId === getCurrentConversationId();
+			const isProcessingConversation = isProcessing() && convId === getProcessingConversationId();
+			return {
+				...conv,
+				isProcessing: isActiveConversation || isProcessingConversation
+			};
+		});
+		postMessage({ type: 'conversationList', data: conversationsWithState });
+	}
+
+	/**
 	 * Switch to a different conversation
 	 */
 	async switchConversation(conversationId: string) {
@@ -103,6 +127,11 @@ export class ConversationHandler {
 		const streamingText = isProcessingConv ? getStreamingText(conversationId) : null;
 
 		// Send conversation loaded message (include streaming text if processing)
+		console.log('[ConversationHandler] switchConversation sending tokens:', {
+			totalTokensInput: conversation.totalTokensInput,
+			totalTokensOutput: conversation.totalTokensOutput,
+			totalCost: conversation.totalCost
+		});
 		postMessage({
 			type: 'conversationLoaded',
 			data: {
@@ -239,8 +268,7 @@ export class ConversationHandler {
 				});
 
 				// Refresh conversation history
-				const conversations = conversationManager.getConversationList();
-				postMessage({ type: 'conversationList', data: conversations });
+				this.sendConversationList();
 				return;
 			}
 		}
@@ -265,7 +293,7 @@ export class ConversationHandler {
 			});
 
 			// This is a non-processing conversation, so clear processing state in UI
-			postMessage({ type: 'setProcessing', data: { isProcessing: false } });
+			postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: activeId });
 
 			// Update session info
 			const session = conversationManager.getCurrentSession();
@@ -281,8 +309,7 @@ export class ConversationHandler {
 			});
 
 			// Refresh conversation history
-			const conversations = conversationManager.getConversationList();
-			postMessage({ type: 'conversationList', data: conversations });
+			this.sendConversationList();
 		} else {
 			console.error('[ConversationHandler] Failed to load conversation, conversation is null/undefined');
 		}

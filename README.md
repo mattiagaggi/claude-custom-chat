@@ -321,6 +321,158 @@ npm install
 Click "F5" to run the extension or access the "Run and Debug" section in VSCode
 ```
 
+### Repository Structure
+
+```
+claude-code-chat/
+├── src/
+│   ├── extension.ts              # Main extension entry point & orchestration
+│   ├── ui.ts                     # Webview HTML generation
+│   ├── ui-styles.ts              # Inline styles for webview
+│   ├── script.ts                 # Script initialization
+│   │
+│   ├── handlers/                 # Message & stream processing
+│   │   ├── index.ts              # Central exports for handlers
+│   │   ├── StreamParser.ts       # Parses Claude CLI JSON stream output
+│   │   ├── StreamCallbacksFactory.ts # Creates callbacks for stream events
+│   │   ├── WebviewMessageHandler.ts  # Routes messages from webview
+│   │   ├── ConversationHandler.ts    # Conversation switching & loading
+│   │   ├── PermissionRequestHandler.ts # Permission prompts & responses
+│   │   ├── MCPHandler.ts         # MCP server configuration
+│   │   └── VSCodeUtilities.ts    # VS Code API wrappers (diff, files, etc.)
+│   │
+│   ├── managers/                 # Business logic & state management
+│   │   ├── index.ts              # Central exports for managers
+│   │   ├── ProcessManager.ts     # Claude CLI process lifecycle
+│   │   ├── ConversationManager.ts # Conversation persistence & history
+│   │   └── PermissionManager.ts  # Permission rules & auto-approval
+│   │
+│   ├── types/                    # TypeScript type definitions
+│   │   ├── index.ts              # Central exports for types
+│   │   ├── conversations.ts      # Conversation data structures
+│   │   ├── messages.ts           # Message types
+│   │   └── settings.ts           # Configuration interfaces
+│   │
+│   ├── utils/                    # Utility functions
+│   │   ├── index.ts              # Central exports for utilities
+│   │   ├── PathConverter.ts      # WSL path conversion
+│   │   └── ProcessKiller.ts      # Cross-platform process termination
+│   │
+│   └── webview/                  # Frontend (JavaScript/CSS)
+│       ├── script.js             # Main entry point, loads all modules
+│       ├── init.js               # Initialization & VS Code API setup
+│       ├── state.js              # Centralized state management
+│       ├── message-handler.js    # Handles messages from extension
+│       ├── message-rendering.js  # Renders chat messages to DOM
+│       ├── event-listeners.js    # DOM event binding
+│       ├── session-management.js # Session & history UI
+│       ├── conversation-tabs.js  # Multi-conversation tab management
+│       ├── permissions.js        # Permission dialog UI
+│       ├── mcp-servers.js        # MCP server configuration UI
+│       ├── modals.js             # Modal dialog management
+│       ├── markdown.js           # Markdown-to-HTML conversion
+│       ├── diff-formatting.js    # Diff visualization
+│       ├── tool-display.js       # Tool execution display
+│       ├── file-picker.js        # @ file reference picker
+│       ├── ui-helpers.js         # Common UI utilities
+│       ├── utils.js              # General utilities
+│       └── styles.css            # All styles (dark/light themes)
+│
+├── test/                         # Test files
+│   ├── extension.test.ts
+│   ├── handlers/
+│   ├── managers/
+│   ├── utils/
+│   └── integration/
+│
+├── package.json                  # Extension manifest & dependencies
+├── tsconfig.json                 # TypeScript configuration
+└── eslint.config.mjs             # ESLint configuration
+```
+
+### Key Files Explained
+
+#### Extension Core (`src/`)
+
+| File | Purpose |
+|------|---------|
+| `extension.ts` | Main entry point. Creates `ClaudeChatProvider` instances, registers commands, and orchestrates all components. |
+| `ui.ts` | Generates the webview HTML with proper CSP headers and resource URIs. |
+
+#### Handlers (`src/handlers/`)
+
+| File | Purpose |
+|------|---------|
+| `StreamParser.ts` | Parses the JSON stream from Claude CLI (`tool_use`, `text_delta`, `result`, etc.) and triggers callbacks. |
+| `StreamCallbacksFactory.ts` | Creates the callback functions that handle parsed stream events and route them to the UI. |
+| `ConversationHandler.ts` | Manages switching between conversations, loading from history, and tracking active conversations. |
+| `PermissionRequestHandler.ts` | Handles permission prompts from Claude, manages pending requests, and sends responses back. |
+| `MCPHandler.ts` | Reads/writes MCP server configuration from `~/.claude/mcp_servers.json`. |
+| `VSCodeUtilities.ts` | Wrappers for VS Code APIs: opening diffs, files, terminals, and handling images. |
+
+#### Managers (`src/managers/`)
+
+| File | Purpose |
+|------|---------|
+| `ProcessManager.ts` | Spawns and manages the Claude CLI process, handles stdin/stdout, supports WSL. |
+| `ConversationManager.ts` | Persists conversations to `~/.claude/conversations/`, manages history index, tracks usage stats. |
+| `PermissionManager.ts` | Stores permission rules, checks auto-approval patterns, handles "always allow" logic. |
+
+#### Utilities (`src/utils/`)
+
+| File | Purpose |
+|------|---------|
+| `PathConverter.ts` | Converts Windows paths to WSL paths and vice versa. |
+| `ProcessKiller.ts` | Cross-platform process termination (handles Windows `taskkill` vs Unix `kill`). |
+
+#### Webview (`src/webview/`)
+
+| File | Purpose |
+|------|---------|
+| `state.js` | Centralized state: `isProcessing`, `messageQueue`, token counts, etc. |
+| `message-handler.js` | Main message router - handles all `postMessage` events from the extension. |
+| `message-rendering.js` | Creates DOM elements for user/assistant/system messages. |
+| `conversation-tabs.js` | Tab UI for switching between multiple active conversations. |
+| `permissions.js` | Renders permission request dialogs with approve/deny/always-allow options. |
+| `diff-formatting.js` | Formats and displays file diffs with syntax highlighting. |
+| `markdown.js` | Converts markdown to HTML with code block handling. |
+| `session-management.js` | History panel, new session creation, conversation list display. |
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         VS Code Extension                        │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    extension.ts                              ││
+│  │         (ClaudeChatProvider - Main Orchestrator)             ││
+│  └─────────────────────────────────────────────────────────────┘│
+│           │                    │                    │            │
+│           ▼                    ▼                    ▼            │
+│  ┌─────────────┐     ┌─────────────┐     ┌─────────────────┐   │
+│  │  Handlers   │     │  Managers   │     │     Webview     │   │
+│  │             │     │             │     │                 │   │
+│  │ StreamParser│     │ProcessMgr   │     │ message-handler │   │
+│  │ Conversation│◄───►│Conversation │◄───►│ state           │   │
+│  │ Permission  │     │Permission   │     │ rendering       │   │
+│  └─────────────┘     └─────────────┘     └─────────────────┘   │
+│           │                    │                                 │
+│           ▼                    ▼                                 │
+│  ┌─────────────────────────────────────────────────────────────┐│
+│  │                    Claude CLI Process                        ││
+│  │                  (JSON stream via stdin/stdout)              ││
+│  └─────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+1. User types message in webview → `message-handler.js`
+2. Webview sends `postMessage` → `extension.ts`
+3. Extension spawns Claude CLI via `ProcessManager`
+4. Claude output parsed by `StreamParser` → callbacks from `StreamCallbacksFactory`
+5. Callbacks update `ConversationManager` and send messages back to webview
+6. Webview renders updates via `message-rendering.js`
+
 ---
 
 ## 📝 **License**

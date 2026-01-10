@@ -1,4 +1,11 @@
-// Session and conversation history management
+/**
+ * session-management.js - Session & History Management
+ *
+ * Manages chat sessions and conversation history UI.
+ * Handles: new session creation, history panel display,
+ * conversation list rendering (with processing indicators),
+ * and loading conversations from history.
+ */
 
 function newSession() {
 	sendStats('New chat');
@@ -146,9 +153,12 @@ function displayConversationList(conversations) {
 		const dateStr = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 		const preview = conv.summary || conv.firstUserMessage || 'New conversation';
 
+		// Add processing indicator if conversation is processing
+		const processingIndicator = conv.isProcessing ? '<span class="conversation-processing-dot" title="Processing"></span>' : '';
+
 		convItem.innerHTML = `
 			<div class="conversation-content">
-				<div class="conversation-preview">${preview}</div>
+				<div class="conversation-preview">${processingIndicator}${preview}</div>
 				<div class="conversation-date">${dateStr}</div>
 			</div>
 			<div class="conversation-actions">

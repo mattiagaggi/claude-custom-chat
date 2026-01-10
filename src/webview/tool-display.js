@@ -1,4 +1,10 @@
-// Tool use and tool result message display functions
+/**
+ * tool-display.js - Tool Execution Display
+ *
+ * Renders tool use and tool result messages in the chat.
+ * Handles: displaying tool names, inputs, outputs, and status.
+ * Groups consecutive same-tool executions for cleaner display.
+ */
 
 // Track consecutive tool uses of same type
 let lastToolUseName = null;

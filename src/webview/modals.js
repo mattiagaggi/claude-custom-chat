@@ -1,4 +1,10 @@
-// Modal management functions (settings, slash commands, model selector, etc.)
+/**
+ * modals.js - Modal Dialog Management
+ *
+ * Manages various modal dialogs: slash commands, model selector,
+ * settings, install prompt, etc. Handles show/hide logic,
+ * keyboard navigation, and search/filter functionality.
+ */
 
 // Slash commands modal
 function showSlashCommandsModal() {

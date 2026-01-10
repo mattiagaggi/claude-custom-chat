@@ -1,4 +1,10 @@
-// Event listeners for user interactions
+/**
+ * event-listeners.js - DOM Event Binding
+ *
+ * Sets up all DOM event listeners for user interactions.
+ * Handles: textarea input/resize, keyboard shortcuts (Enter, @, /),
+ * button clicks, drag-and-drop, paste events, and scroll behavior.
+ */
 
 // Auto-resize textarea on input
 messageInput.addEventListener('input', adjustTextareaHeight);

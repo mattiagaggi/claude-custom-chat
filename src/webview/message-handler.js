@@ -1,4 +1,11 @@
-// Window message event handler - handles all messages from VS Code extension
+/**
+ * message-handler.js - Extension Message Router
+ *
+ * Handles all incoming postMessage events from the VS Code extension.
+ * Routes messages to appropriate handlers based on message type.
+ * Key message types: textDelta, toolUse, toolResult, permissionRequest,
+ * conversationLoaded, setProcessing, loading, error, etc.
+ */
 
 // Track which conversation is currently being viewed in this webview
 let currentViewedConversationId = null;
@@ -43,6 +50,10 @@ window.addEventListener('message', event => {
 		}
 
 		case 'output':
+			// Only display output for the currently viewed conversation
+			if (!isMessageForCurrentConversation(message)) {
+				break;
+			}
 			if (message.data.trim()) {
 				let displayData = message.data;
 
@@ -81,6 +92,10 @@ window.addEventListener('message', event => {
 
 		case 'assistantMessage':
 			// Handle assistant message from Claude
+			// Only display for the currently viewed conversation
+			if (!isMessageForCurrentConversation(message)) {
+				break;
+			}
 			currentStreamingMessageId = null;
 			if (message.data && message.data.trim()) {
 				addMessage(parseSimpleMarkdown(message.data), 'claude');
@@ -149,7 +164,8 @@ window.addEventListener('message', event => {
 
 		case 'streamingReplay':
 			// Replay accumulated streaming text after visibility change
-			if (message.data) {
+			// Only process if for current conversation
+			if (isMessageForCurrentConversation(message) && message.data) {
 				// Initialize streaming state with the full accumulated text
 				window.streamingState = {
 					fullText: message.data,
@@ -182,8 +198,11 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'loading':
-			addMessage(message.data, 'system');
-			updateStatusWithTotals();
+			// Only display loading message for the currently viewed conversation
+			if (isMessageForCurrentConversation(message)) {
+				addMessage(message.data, 'system');
+				updateStatusWithTotals();
+			}
 			break;
 
 		case 'setProcessing':
@@ -282,6 +301,10 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'thinking':
+			// Only display thinking for the currently viewed conversation
+			if (!isMessageForCurrentConversation(message)) {
+				break;
+			}
 			if (message.data.trim()) {
 				addMessage(parseSimpleMarkdown(message.data), 'thinking');
 			}
@@ -496,8 +519,15 @@ window.addEventListener('message', event => {
 				console.log('[conversationLoaded] Set currentViewedConversationId:', currentViewedConversationId);
 			}
 
-			// DON'T clear processing state here - it will be set by setProcessing message if needed
-			// The extension sends setProcessing after conversationLoaded if the conversation is processing
+			// Reset processing state when loading a non-streaming conversation
+			// The extension will send setProcessing:true after this if the conversation IS processing
+			if (!message.data.streamingText) {
+				isProcessing = false;
+				stopRequestTimer();
+				hideStopButton();
+				enableButtons();
+				hideProcessingIndicator();
+			}
 			messageQueue.length = 0; // Clear any queued messages
 
 			// Clear current messages
@@ -543,13 +573,27 @@ window.addEventListener('message', event => {
 				addMessage(parsedContent, 'claude');
 			}
 
-			// Update usage stats
+			// Update usage stats from conversation data
+			console.log('[conversationLoaded] Usage data:', {
+				totalTokens: message.data.totalTokens,
+				totalCost: message.data.totalCost,
+				messageCount: message.data.messages?.length
+			});
 			if (message.data.totalTokens) {
 				totalTokensInput = message.data.totalTokens.input || 0;
 				totalTokensOutput = message.data.totalTokens.output || 0;
-				totalCost = message.data.totalCost || 0;
-				requestCount = message.data.messageCount || 0;
+			} else {
+				totalTokensInput = 0;
+				totalTokensOutput = 0;
 			}
+			totalCost = message.data.totalCost || 0;
+			// Calculate request count from user messages (each userInput = 1 request)
+			if (message.data.messages) {
+				requestCount = message.data.messages.filter(m => m.messageType === 'userInput').length;
+			} else {
+				requestCount = message.data.requestCount || 0;
+			}
+			console.log('[conversationLoaded] Updated usage:', { totalTokensInput, totalTokensOutput, totalCost, requestCount });
 			updateStatusWithTotals();
 
 			// Scroll to bottom

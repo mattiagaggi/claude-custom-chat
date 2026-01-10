@@ -1,4 +1,10 @@
-// Global state variables
+/**
+ * state.js - Centralized State Management
+ *
+ * Defines all global state variables used across webview modules.
+ * Includes: VS Code API, DOM element references, processing state,
+ * message queue, token/cost tracking, and UI state flags.
+ */
 
 const vscode = acquireVsCodeApi();
 const messagesDiv = document.getElementById('messages');

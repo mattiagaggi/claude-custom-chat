@@ -1,4 +1,10 @@
-// Conversation tabs management
+/**
+ * conversation-tabs.js - Multi-Conversation Tab UI
+ *
+ * Manages the tab bar for switching between multiple active conversations.
+ * Tracks active conversations, renders tab UI, handles tab switching,
+ * and shows processing indicators on tabs.
+ */
 
 // Track active conversations (indexed by conversation ID)
 let activeConversations = new Map();
@@ -110,7 +116,7 @@ function renderConversationTabs() {
 
 	// Show/hide tabs container based on number of conversations
 	if (activeConversations.size > 1) {
-		tabsContainer.style.display = 'block';
+		tabsContainer.style.display = 'flex';
 	} else {
 		tabsContainer.style.display = 'none';
 		return;
@@ -118,6 +124,21 @@ function renderConversationTabs() {
 
 	// Clear existing tabs
 	tabsList.innerHTML = '';
+
+	// Add clear all button if more than 2 tabs
+	let clearAllBtn = tabsContainer.querySelector('.clear-all-tabs-btn');
+	if (activeConversations.size > 2) {
+		if (!clearAllBtn) {
+			clearAllBtn = document.createElement('button');
+			clearAllBtn.className = 'clear-all-tabs-btn';
+			clearAllBtn.title = 'Close all other tabs';
+			clearAllBtn.textContent = '✕ Clear';
+			clearAllBtn.onclick = clearAllTabs;
+			tabsContainer.appendChild(clearAllBtn);
+		}
+	} else if (clearAllBtn) {
+		clearAllBtn.remove();
+	}
 
 	// Render each conversation tab
 	activeConversations.forEach((conversation, conversationId) => {
@@ -229,6 +250,30 @@ function handleActiveConversationsList(conversations) {
 		if (conv.isActive) {
 			currentActiveConversationId = conv.id;
 		}
+	});
+
+	renderConversationTabs();
+}
+
+/**
+ * Clear all tabs except the current one
+ */
+function clearAllTabs() {
+	// Get all conversation IDs except the current one
+	const tabsToClose = [];
+	activeConversations.forEach((_, conversationId) => {
+		if (conversationId !== currentActiveConversationId) {
+			tabsToClose.push(conversationId);
+		}
+	});
+
+	// Close each tab
+	tabsToClose.forEach(conversationId => {
+		activeConversations.delete(conversationId);
+		vscode.postMessage({
+			type: 'closeConversation',
+			conversationId: conversationId
+		});
 	});
 
 	renderConversationTabs();

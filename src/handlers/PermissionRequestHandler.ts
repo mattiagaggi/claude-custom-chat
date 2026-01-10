@@ -1,5 +1,10 @@
 /**
- * PermissionRequestHandler - Handles permission requests and responses for Claude CLI
+ * PermissionRequestHandler.ts - Permission Prompt Handler
+ *
+ * Handles permission requests from Claude CLI (tool execution approvals).
+ * Manages pending permission requests, checks auto-approval rules via PermissionManager,
+ * sends permission prompts to the webview, and writes responses back to Claude CLI stdin.
+ * Also handles AskUserQuestion tool requests.
  */
 
 import { PermissionManager, ProcessManager } from '../managers';
@@ -217,5 +222,39 @@ export class PermissionRequestHandler {
 	 */
 	hasPending(): boolean {
 		return this.pendingPermissions.size > 0;
+	}
+
+	/**
+	 * Resend all pending permission requests to the UI
+	 * Called when switching conversations to restore permission prompts
+	 */
+	resendPendingPermissions(): void {
+		for (const [request_id, requestData] of this.pendingPermissions) {
+			const tool_name = requestData.request?.tool_name || requestData.tool_name;
+			const input = requestData.request?.input || requestData.input;
+
+			if (tool_name === 'AskUserQuestion') {
+				// Resend user question
+				this.config.postMessage({
+					type: 'userQuestion',
+					data: {
+						id: request_id,
+						questions: input.questions || []
+					}
+				});
+			} else {
+				// Resend permission request
+				this.config.postMessage({
+					type: 'permissionRequest',
+					data: {
+						id: request_id,
+						toolName: tool_name,
+						input,
+						status: 'pending',
+						suggestions: requestData.request?.suggestions || requestData.suggestions
+					}
+				});
+			}
+		}
 	}
 }

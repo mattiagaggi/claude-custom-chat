@@ -1,4 +1,10 @@
-// Utility functions for the webview
+/**
+ * utils.js - General Utility Functions
+ *
+ * Shared utility functions for the webview.
+ * Handles: HTML escaping, file path formatting,
+ * file icon selection, and file opening in editor.
+ */
 
 function escapeHtml(text) {
 	const div = document.createElement('div');

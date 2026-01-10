@@ -1,5 +1,9 @@
 /**
- * MCPHandler - Manages MCP (Model Context Protocol) server configuration
+ * MCPHandler.ts - MCP Server Configuration Manager
+ *
+ * Manages Model Context Protocol (MCP) server configuration.
+ * Reads/writes server config from ~/.claude/mcp_servers.json.
+ * Provides methods to list, add, update, and remove MCP servers.
  */
 
 import * as path from 'path';

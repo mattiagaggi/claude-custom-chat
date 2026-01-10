@@ -1,4 +1,10 @@
-// Message rendering functions
+/**
+ * message-rendering.js - Chat Message DOM Rendering
+ *
+ * Creates and updates DOM elements for chat messages.
+ * Handles: user messages, Claude responses, system messages, errors.
+ * Supports streaming updates (appending to last message).
+ */
 
 // Helper to append to the last Claude message (for streaming responses)
 let currentStreamingMessageId = null;

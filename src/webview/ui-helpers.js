@@ -1,4 +1,10 @@
-// UI Helper Functions - Scroll management, processing indicators, status updates
+/**
+ * ui-helpers.js - Common UI Utilities
+ *
+ * Shared UI helper functions used across webview modules.
+ * Handles: auto-scroll detection, processing indicators,
+ * button enable/disable, status bar updates, timer display.
+ */
 
 function shouldAutoScroll(messagesDiv) {
 	const threshold = 100; // pixels from bottom
@@ -291,8 +297,10 @@ function copyMessageContent(messageDiv) {
 	const contentDiv = messageDiv.querySelector('.message-content');
 	if (contentDiv) {
 		const textContent = contentDiv.innerText;
-		navigator.clipboard.writeText(textContent).then(() => {
-			const copyBtn = messageDiv.querySelector('.copy-btn');
+		const copyBtn = messageDiv.querySelector('.copy-btn');
+
+		const showSuccess = () => {
+			if (!copyBtn) return;
 			const originalHtml = copyBtn.innerHTML;
 			copyBtn.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
 			copyBtn.style.color = '#4caf50';
@@ -301,8 +309,13 @@ function copyMessageContent(messageDiv) {
 				copyBtn.innerHTML = originalHtml;
 				copyBtn.style.color = '';
 			}, 1000);
-		}).catch(err => {
-			console.error('Failed to copy message:', err);
+		};
+
+		// Try clipboard API first, fall back to VS Code clipboard if it fails
+		navigator.clipboard.writeText(textContent).then(showSuccess).catch(() => {
+			// Fallback: use VS Code extension to copy (handles focus issues in webview)
+			vscode.postMessage({ type: 'copyToClipboard', text: textContent });
+			showSuccess();
 		});
 	}
 }

@@ -1,5 +1,8 @@
 /**
- * Central export for all handler classes
+ * handlers/index.ts - Central Exports for Handlers
+ *
+ * Re-exports all handler classes and functions for convenient importing.
+ * Import from './handlers' instead of individual files.
  */
 
 export * from './WebviewMessageHandler';

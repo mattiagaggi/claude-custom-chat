@@ -1,6 +1,9 @@
 /**
- * WebviewMessageHandler - Handles all messages from the webview
- * Centralizes webview communication logic
+ * WebviewMessageHandler.ts - Webview Message Router
+ *
+ * Routes incoming messages from the webview to appropriate handler functions.
+ * Acts as the central communication hub between the webview UI and the extension.
+ * Handles: send message, new session, stop request, file operations, permissions, etc.
  */
 
 import * as vscode from 'vscode';

@@ -1,5 +1,9 @@
 /**
- * StreamCallbacksFactory - Creates stream parser callbacks
+ * StreamCallbacksFactory.ts - Stream Event Callback Factory
+ *
+ * Creates the callback functions used by StreamParser to handle parsed events.
+ * Each callback handles a specific event type (tool_use, text_delta, result, etc.)
+ * and routes data to the ConversationManager for persistence and to the webview for display.
  *
  * Architecture: Backend operates independently - always saves messages and sends to UI with conversationId.
  * The webview decides what to display based on which conversation is currently being viewed.
@@ -13,7 +17,9 @@ export interface StreamCallbacksConfig {
 	conversationManager: ConversationManager;
 	context: vscode.ExtensionContext;
 	postMessage: (message: any) => void;
+	getCurrentConversationId: () => string | undefined;
 	getProcessingConversationId: () => string | undefined;
+	isProcessing: () => boolean;
 	setProcessingState: (isProcessing: boolean, conversationId?: string) => void;
 	getStreamingText: (conversationId: string) => string | undefined;
 	setStreamingText: (conversationId: string, text: string) => void;
@@ -26,13 +32,31 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 		conversationManager,
 		context,
 		postMessage,
+		getCurrentConversationId,
 		getProcessingConversationId,
+		isProcessing,
 		setProcessingState,
 		getStreamingText,
 		setStreamingText,
 		deleteStreamingText,
 		onControlRequest
 	} = config;
+
+	// Helper to send conversation list with processing state
+	// Show green dot if: conversation is processing OR is the current active conversation
+	const sendConversationList = () => {
+		const conversations = conversationManager.getConversationList();
+		const conversationsWithState = conversations.map(conv => {
+			const convId = conversationManager.getConversationIdForFilename(conv.filename);
+			const isActiveConversation = convId === getCurrentConversationId();
+			const isProcessingConversation = isProcessing() && convId === getProcessingConversationId();
+			return {
+				...conv,
+				isProcessing: isActiveConversation || isProcessingConversation
+			};
+		});
+		postMessage({ type: 'conversationList', data: conversationsWithState });
+	};
 
 	return {
 		onSessionStart: (sessionId: string) => {
@@ -95,13 +119,17 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 		},
 
 		onTokenUsage: (inputTokens: number, outputTokens: number) => {
+			// Skip if no processingConvId - onResult already handled usage and cleared state
 			const processingConvId = getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onTokenUsage called:', { inputTokens, outputTokens, processingConvId });
+			if (!processingConvId) {
+				console.log('[StreamCallbacksFactory] onTokenUsage skipped - no processingConvId');
+				return;
+			}
 			conversationManager.updateUsage(0, inputTokens, outputTokens, processingConvId);
+			console.log('[StreamCallbacksFactory] onTokenUsage - updated conversation usage');
 
-			// Always send usage to UI with conversationId - UI will filter
-			const conversation = processingConvId
-				? conversationManager.getConversation(processingConvId)
-				: null;
+			const conversation = conversationManager.getConversation(processingConvId);
 			postMessage({
 				type: 'usage',
 				data: {
@@ -114,13 +142,14 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 		},
 
 		onCostUpdate: (cost: number) => {
+			// Skip if no processingConvId - onResult already handled usage and cleared state
 			const processingConvId = getProcessingConversationId();
+			if (!processingConvId) {
+				return;
+			}
 			conversationManager.updateUsage(cost, 0, 0, processingConvId);
 
-			// Always send cost to UI with conversationId - UI will filter
-			const conversation = processingConvId
-				? conversationManager.getConversation(processingConvId)
-				: null;
+			const conversation = conversationManager.getConversation(processingConvId);
 			postMessage({
 				type: 'usage',
 				data: {
@@ -134,6 +163,9 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 
 		onResult: async (data: any) => {
 			const processingConvId = getProcessingConversationId();
+
+			// Debug: Log subtype and end-of-turn indicators
+			console.log('[StreamCallbacksFactory] onResult subtype:', data.subtype, 'is_done:', data.is_done, 'stop_reason:', data.stop_reason, 'full data:', JSON.stringify(data).substring(0, 500));
 
 			// Always send result to UI with conversationId - UI will filter
 			postMessage({
@@ -180,12 +212,28 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			await conversationManager.saveConversation(processingConvId);
 
 			// Refresh conversation list to update timestamps
-			const conversations = conversationManager.getConversationList();
-			postMessage({ type: 'conversationList', data: conversations });
+			sendConversationList();
 
 			// Set processing to false AFTER all usage handling is complete
 			// This ensures onTokenUsage/onCostUpdate callbacks can still access processingConvId
-			if (data.subtype === 'success' || data.subtype?.startsWith('error')) {
+			//
+			// End-of-turn detection:
+			// - is_done === true: explicit completion flag
+			// - stop_reason: indicates why model stopped (e.g., "end_turn", "tool_use")
+			// - stop_reason === "end_turn": model finished its response
+			// - subtype === 'success' with cost/tokens: final result with billing info
+			// - subtype starts with 'error': error cases should end processing
+			//
+			// Note: Intermediate tool results may have subtype 'success' but typically no cost info
+			const hasBillingInfo = (inputTokens > 0 || outputTokens > 0 || cost > 0);
+			const isEndOfTurn = data.is_done === true ||
+				data.stop_reason === 'end_turn' ||
+				(data.subtype === 'success' && hasBillingInfo) ||
+				data.subtype?.startsWith('error');
+
+			console.log('[StreamCallbacksFactory] isEndOfTurn check:', { isEndOfTurn, is_done: data.is_done, stop_reason: data.stop_reason, subtype: data.subtype, hasBillingInfo });
+
+			if (isEndOfTurn) {
 				postMessage({
 					type: 'setProcessing',
 					data: { isProcessing: false },

@@ -1,4 +1,10 @@
-// MCP (Model Context Protocol) server management functions
+/**
+ * mcp-servers.js - MCP Server Configuration UI
+ *
+ * Manages the MCP (Model Context Protocol) server configuration modal.
+ * Handles: displaying server list, adding/editing/removing servers,
+ * popular server gallery, and saving configuration changes.
+ */
 
 function showMCPModal() {
 	document.getElementById('mcpModal').style.display = 'flex';

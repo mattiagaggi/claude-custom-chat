@@ -1,5 +1,9 @@
 /**
- * Utility for converting paths between Windows and WSL formats
+ * PathConverter.ts - WSL Path Conversion Utilities
+ *
+ * Converts paths between Windows and WSL (Windows Subsystem for Linux) formats.
+ * Used when running Claude CLI through WSL on Windows.
+ * Example: C:\Users\name\project → /mnt/c/users/name/project
  */
 
 /**

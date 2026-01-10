@@ -179,7 +179,9 @@ class ClaudeChatProvider {
 			conversationManager: this.conversationManager,
 			context: this.context,
 			postMessage: (msg) => this.postMessage(msg),
+			getCurrentConversationId: () => this.currentConversationId,
 			getProcessingConversationId: () => this.processingConversationId,
+			isProcessing: () => this.isProcessing,
 			setProcessingState: (isProcessing) => {
 				this.isProcessing = isProcessing;
 				if (!isProcessing) {
@@ -266,14 +268,18 @@ class ClaudeChatProvider {
 			const streamingText = this.conversationStreamingText.get(this.currentConversationId || '');
 			if (streamingText) {
 				// Send accumulated text as a single chunk so webview can render it
-				this.postMessage({ type: 'streamingReplay', data: streamingText });
+				this.postMessage({ type: 'streamingReplay', data: streamingText, conversationId: this.currentConversationId });
 			}
 			// Restore processing state
 			this.postMessage({
 				type: 'setProcessing',
-				data: { isProcessing: true, requestStartTime: Date.now() }
+				data: { isProcessing: true, requestStartTime: Date.now() },
+				conversationId: this.currentConversationId
 			});
 		}
+
+		// Resend any pending permission requests so they appear in the UI
+		this.permissionRequestHandler.resendPendingPermissions();
 	}
 
 	/**
@@ -290,6 +296,9 @@ class ClaudeChatProvider {
 	private async handleWebviewMessage(message: any) {
 		// Handle messages that need special treatment
 		switch (message.type) {
+			case 'ready':
+				// Webview has loaded/reloaded - send current state
+				return this.handleWebviewReady();
 			case 'getConversationList':
 				return this.sendConversationList();
 			case 'getWorkspaceFiles':
@@ -312,6 +321,8 @@ class ClaudeChatProvider {
 				return this.createImageFile(message.imageData, message.imageType);
 			case 'selectImageFile':
 				return this.selectImageFile();
+			case 'copyToClipboard':
+				return vscode.env.clipboard.writeText(message.text);
 		}
 
 		// Delegate to message handler
@@ -447,11 +458,10 @@ class ClaudeChatProvider {
 		// Save conversation immediately so it appears in history list
 		// This allows user to click back to it while processing
 		await this.conversationManager.saveConversation(this.currentConversationId);
-		const conversations = this.conversationManager.getConversationList();
-		this.postMessage({ type: 'conversationList', data: conversations });
+		this.sendConversationList();
 
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: true } });
-		this.postMessage({ type: 'loading', data: 'Claude is working...' });
+		this.postMessage({ type: 'setProcessing', data: { isProcessing: true }, conversationId: this.currentConversationId });
+		this.postMessage({ type: 'loading', data: 'Claude is working...', conversationId: this.currentConversationId });
 
 		try {
 			// Spawn process with conversation ID
@@ -499,7 +509,7 @@ class ClaudeChatProvider {
 				const error = data.toString();
 				console.error('[Extension] Claude stderr:', error);
 				if (error.trim()) {
-					this.postMessage({ type: 'error', data: `[CLI Error] ${error}` });
+					this.postMessage({ type: 'error', data: `[CLI Error] ${error}`, conversationId: this.processingConversationId });
 				}
 			});
 
@@ -507,11 +517,10 @@ class ClaudeChatProvider {
 			process.on('close', (code) => {
 				console.log('[Extension] Claude process closed with code:', code);
 				this.currentProcess = undefined;
-				// Only update UI if viewing the conversation that just finished
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'clearLoading' });
-					this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
-				}
+				// Send with conversationId - webview will filter based on current view
+				const closedConvId = this.processingConversationId;
+				this.postMessage({ type: 'clearLoading', conversationId: closedConvId });
+				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: closedConvId });
 				this.isProcessing = false;
 				this.processingConversationId = undefined;
 				this.permissionManager.cancelAllPending();
@@ -521,11 +530,10 @@ class ClaudeChatProvider {
 			process.on('error', (error) => {
 				console.error('[Extension] Claude process error:', error);
 				this.currentProcess = undefined;
-				// Only update UI if viewing the conversation that errored
-				if (this.processingConversationId === this.currentConversationId) {
-					this.postMessage({ type: 'clearLoading' });
-					this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
-				}
+				// Send with conversationId - webview will filter based on current view
+				const errorConvId = this.processingConversationId;
+				this.postMessage({ type: 'clearLoading', conversationId: errorConvId });
+				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: errorConvId });
 				this.isProcessing = false;
 				this.processingConversationId = undefined;
 
@@ -537,8 +545,9 @@ class ClaudeChatProvider {
 			});
 
 		} catch (error: any) {
-			this.postMessage({ type: 'clearLoading' });
-			this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
+			const catchConvId = this.processingConversationId;
+			this.postMessage({ type: 'clearLoading', conversationId: catchConvId });
+			this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: catchConvId });
 			this.isProcessing = false;
 			this.processingConversationId = undefined;
 			this.sendAndSaveMessage({ type: 'error', data: `Failed to start: ${error.message}` });
@@ -619,11 +628,10 @@ class ClaudeChatProvider {
 			conversationId: this.currentConversationId
 		});
 		// The new conversation is not processing (the old one might still be)
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: false } });
+		this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: this.currentConversationId });
 
 		// Refresh conversation history
-		const conversations = this.conversationManager.getConversationList();
-		this.postMessage({ type: 'conversationList', data: conversations });
+		this.sendConversationList();
 	}
 
 	/**
@@ -634,6 +642,8 @@ class ClaudeChatProvider {
 			isProcessing: this.isProcessing,
 			processingConversationId: this.processingConversationId
 		});
+		// Resend any pending permission requests so they appear in the UI
+		this.permissionRequestHandler.resendPendingPermissions();
 	}
 
 	/**
@@ -675,12 +685,24 @@ class ClaudeChatProvider {
 	}
 
 	/**
+	 * Handle webview ready message - restore state when webview loads/reloads
+	 */
+	private handleWebviewReady() {
+		console.log('[Extension] handleWebviewReady called');
+		// Reinitialize sends all necessary state to the webview
+		this.reinitialize();
+	}
+
+	/**
 	 * Send current conversation's usage stats to webview
 	 */
 	private sendCurrentUsage() {
+		console.log('[Extension] sendCurrentUsage called, currentConversationId:', this.currentConversationId);
 		const conversation = this.currentConversationId
 			? this.conversationManager.getConversation(this.currentConversationId)
 			: null;
+
+		console.log('[Extension] sendCurrentUsage conversation found:', !!conversation, 'tokens:', conversation?.totalTokensInput, conversation?.totalTokensOutput);
 
 		if (conversation) {
 			// Count messages to get request count (user messages = requests)
@@ -699,6 +721,8 @@ class ClaudeChatProvider {
 				},
 				conversationId: this.currentConversationId
 			});
+		} else {
+			console.log('[Extension] sendCurrentUsage: No conversation found, not sending usage');
 		}
 	}
 
@@ -718,8 +742,23 @@ class ClaudeChatProvider {
 	}
 
 	// Simplified helper methods (implementation details)
-	private sendConversationList() {
+	private getConversationListWithProcessingState() {
 		const conversations = this.conversationManager.getConversationList();
+		// Add processing state to each conversation
+		// Show green dot if: conversation is processing OR is the current active conversation
+		return conversations.map(conv => {
+			const convId = this.conversationManager.getConversationIdForFilename(conv.filename);
+			const isActiveConversation = convId === this.currentConversationId;
+			const isProcessingConversation = this.isProcessing && convId === this.processingConversationId;
+			return {
+				...conv,
+				isProcessing: isActiveConversation || isProcessingConversation
+			};
+		});
+	}
+
+	private sendConversationList() {
+		const conversations = this.getConversationListWithProcessingState();
 		console.log('[Extension] Sending conversation list:', conversations.length, 'conversations');
 		this.postMessage({ type: 'conversationList', data: conversations });
 	}
@@ -882,6 +921,8 @@ class ClaudeChatProvider {
 	 */
 	private async switchConversation(conversationId: string) {
 		await this.conversationHandler.switchConversation(conversationId);
+		// Resend any pending permission requests so they appear in the UI
+		this.permissionRequestHandler.resendPendingPermissions();
 	}
 
 	/**

@@ -1,3 +1,11 @@
+/**
+ * ui.ts - Webview HTML Generation
+ *
+ * Generates the HTML content for the chat webview panel.
+ * Includes proper Content Security Policy headers, resource URIs,
+ * and the base HTML structure for the chat interface.
+ */
+
 import getScript from './script';
 import styles from './ui-styles'
 

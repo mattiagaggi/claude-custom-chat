@@ -1,4 +1,10 @@
-// Diff formatting and visualization functions
+/**
+ * diff-formatting.js - Diff Visualization & Formatting
+ *
+ * Formats and displays file diffs with syntax highlighting.
+ * Handles: unified diff parsing, line-by-line coloring (green/red),
+ * truncation for long diffs, and "Open in VS Code Diff" button.
+ */
 
 function formatToolInputUI(input) {
 	if (!input || typeof input !== 'object') {

@@ -1,4 +1,10 @@
-// File picker modal functions
+/**
+ * file-picker.js - @ File Reference Picker
+ *
+ * Manages the file picker modal triggered by typing "@".
+ * Handles: displaying workspace files, search/filter,
+ * keyboard navigation, and inserting file references into input.
+ */
 
 function showFilePicker() {
 	// Request initial file list from VS Code

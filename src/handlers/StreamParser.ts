@@ -1,6 +1,10 @@
 /**
- * StreamParser - Parses Claude's stream-json output
- * Handles different message types and extracts data
+ * StreamParser.ts - Claude CLI Output Parser
+ *
+ * Parses the JSON stream output from Claude CLI (stdout).
+ * Handles different message types: tool_use, text_delta, result, control_request, etc.
+ * Triggers callbacks for each parsed event type, allowing the extension to react
+ * to streaming responses, tool executions, and permission requests.
  */
 
 export interface StreamCallbacks {
@@ -215,8 +219,17 @@ export class StreamParser {
 			this.messageSentThisTurn = false;
 
 			// Extract usage info - can be at top level or in usage object
-			const inputTokens = data.input_tokens || data.usage?.input_tokens || 0;
-			const outputTokens = data.output_tokens || data.usage?.output_tokens || 0;
+			// Also check for nested result.usage structure
+			const usage = data.usage || data.result?.usage || {};
+			const inputTokens = data.input_tokens || usage.input_tokens || 0;
+			const outputTokens = data.output_tokens || usage.output_tokens || 0;
+			console.log('[StreamParser] Result token extraction:', {
+				'data.input_tokens': data.input_tokens,
+				'data.output_tokens': data.output_tokens,
+				'data.usage': data.usage,
+				'data.result?.usage': data.result?.usage,
+				'resolved': { inputTokens, outputTokens }
+			});
 			if (inputTokens || outputTokens) {
 				console.log('[StreamParser] Tokens found:', inputTokens, outputTokens);
 				this.callbacks.onTokenUsage?.(inputTokens, outputTokens);

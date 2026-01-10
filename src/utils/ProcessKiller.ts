@@ -1,5 +1,9 @@
 /**
- * Cross-platform process termination utilities
+ * ProcessKiller.ts - Cross-Platform Process Termination
+ *
+ * Provides reliable process termination across Windows, Mac, and Linux.
+ * Handles process groups and child processes to ensure clean shutdown.
+ * Uses `taskkill` on Windows and `kill` signals on Unix systems.
  */
 
 import { promisify } from 'util';

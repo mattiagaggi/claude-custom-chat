@@ -1,9 +1,11 @@
 /**
- * ProcessManager - Handles Claude process lifecycle
- * Responsibilities:
- * - Spawning Claude processes (native or WSL)
- * - Managing process I/O streams
- * - Process termination and cleanup
+ * ProcessManager.ts - Claude CLI Process Lifecycle Manager
+ *
+ * Manages the Claude CLI child process:
+ * - Spawning processes (native Windows/Mac/Linux or WSL)
+ * - Writing to stdin (sending messages to Claude)
+ * - Managing stdout/stderr streams
+ * - Process termination and cleanup (cross-platform kill)
  */
 
 import * as cp from 'child_process';

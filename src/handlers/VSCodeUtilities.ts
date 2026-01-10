@@ -1,5 +1,12 @@
 /**
- * VSCodeUtilities - Utility functions for VS Code operations
+ * VSCodeUtilities.ts - VS Code API Wrappers
+ *
+ * Provides utility functions for common VS Code operations:
+ * - Opening diff views (side-by-side file comparisons)
+ * - Opening files in the editor
+ * - Image selection and clipboard handling
+ * - Terminal operations for slash commands
+ * - Settings management
  */
 
 import * as vscode from 'vscode';

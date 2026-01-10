@@ -1,4 +1,10 @@
-// Markdown parsing functions
+/**
+ * markdown.js - Markdown to HTML Conversion
+ *
+ * Parses markdown text and converts it to HTML for display.
+ * Handles: code blocks (with syntax highlighting), inline code,
+ * bold, italic, links, lists, headers, and blockquotes.
+ */
 
 function parseSimpleMarkdown(markdown) {
 	// First, handle code blocks before line-by-line processing
