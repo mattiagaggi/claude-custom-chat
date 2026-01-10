@@ -7,6 +7,10 @@
  *
  * Architecture: Backend operates independently - always saves messages and sends to UI with conversationId.
  * The webview decides what to display based on which conversation is currently being viewed.
+ *
+ * IMPORTANT: Each callback now receives the conversationId from the StreamParser, which captures it
+ * at the time the data is parsed. This ensures messages go to the correct conversation even if
+ * the user has switched to a different conversation while the process is still running.
  */
 
 import * as vscode from 'vscode';
@@ -59,38 +63,49 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 	};
 
 	return {
-		onSessionStart: (sessionId: string) => {
-			conversationManager.setSessionId(sessionId, getProcessingConversationId());
+		onSessionStart: (sessionId: string, conversationId?: string) => {
+			// Use the conversationId from the parser, falling back to getProcessingConversationId for compatibility
+			const convId = conversationId || getProcessingConversationId();
+			conversationManager.setSessionId(sessionId, convId);
 		},
 
-		onToolUse: (data: any) => {
-			const processingConvId = getProcessingConversationId();
+		onToolUse: (data: any, conversationId?: string) => {
+			// Use the conversationId from the parser - this is the correct conversation for this data
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onToolUse - convId:', convId);
 			// Always save to conversation
-			conversationManager.addMessage('toolUse', data, processingConvId);
+			conversationManager.addMessage('toolUse', data, convId);
 			// Always send to UI with conversationId - UI will filter
 			postMessage({
 				type: 'toolUse',
 				data,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onToolResult: (data: any) => {
-			const processingConvId = getProcessingConversationId();
+		onToolResult: (data: any, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onToolResult - convId:', convId);
 			// Always save to conversation
-			conversationManager.addMessage('toolResult', data, processingConvId);
+			conversationManager.addMessage('toolResult', data, convId);
 			// Always send to UI with conversationId - UI will filter
 			postMessage({
 				type: 'toolResult',
 				data,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onTextDelta: (text: string) => {
-			const processingConvId = getProcessingConversationId();
-			// Accumulate streaming text for the processing conversation
-			const convId = processingConvId || '';
+		onTextDelta: (text: string, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onTextDelta - convId:', convId);
+
+			if (!convId) {
+				console.log('[StreamCallbacksFactory] onTextDelta skipped - no conversationId');
+				return;
+			}
+
+			// Accumulate streaming text for this conversation
 			const currentText = getStreamingText(convId) || '';
 			setStreamingText(convId, currentText + text);
 
@@ -98,38 +113,45 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			postMessage({
 				type: 'textDelta',
 				data: text,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onMessage: (content: string) => {
-			const processingConvId = getProcessingConversationId();
+		onMessage: (content: string, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onMessage - convId:', convId);
+
+			if (!convId) {
+				console.log('[StreamCallbacksFactory] onMessage skipped - no conversationId');
+				return;
+			}
+
 			// Clear streaming text for this conversation - message is complete
-			const convId = processingConvId || '';
 			deleteStreamingText(convId);
 
 			// Always save to conversation
-			conversationManager.addMessage('assistantMessage', content, processingConvId);
+			conversationManager.addMessage('assistantMessage', content, convId);
 			// Always send to UI with conversationId - UI will filter
 			postMessage({
 				type: 'finalizeStreaming',
 				data: content,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onTokenUsage: (inputTokens: number, outputTokens: number) => {
-			// Skip if no processingConvId - onResult already handled usage and cleared state
-			const processingConvId = getProcessingConversationId();
-			console.log('[StreamCallbacksFactory] onTokenUsage called:', { inputTokens, outputTokens, processingConvId });
-			if (!processingConvId) {
-				console.log('[StreamCallbacksFactory] onTokenUsage skipped - no processingConvId');
+		onTokenUsage: (inputTokens: number, outputTokens: number, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onTokenUsage called:', { inputTokens, outputTokens, convId });
+
+			if (!convId) {
+				console.log('[StreamCallbacksFactory] onTokenUsage skipped - no conversationId');
 				return;
 			}
-			conversationManager.updateUsage(0, inputTokens, outputTokens, processingConvId);
+
+			conversationManager.updateUsage(0, inputTokens, outputTokens, convId);
 			console.log('[StreamCallbacksFactory] onTokenUsage - updated conversation usage');
 
-			const conversation = conversationManager.getConversation(processingConvId);
+			const conversation = conversationManager.getConversation(convId);
 			postMessage({
 				type: 'usage',
 				data: {
@@ -137,19 +159,20 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 					outputTokens: conversation?.totalTokensOutput || 0,
 					totalCost: conversation?.totalCost || 0
 				},
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onCostUpdate: (cost: number) => {
-			// Skip if no processingConvId - onResult already handled usage and cleared state
-			const processingConvId = getProcessingConversationId();
-			if (!processingConvId) {
+		onCostUpdate: (cost: number, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+
+			if (!convId) {
 				return;
 			}
-			conversationManager.updateUsage(cost, 0, 0, processingConvId);
 
-			const conversation = conversationManager.getConversation(processingConvId);
+			conversationManager.updateUsage(cost, 0, 0, convId);
+
+			const conversation = conversationManager.getConversation(convId);
 			postMessage({
 				type: 'usage',
 				data: {
@@ -157,12 +180,13 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 					outputTokens: conversation?.totalTokensOutput || 0,
 					totalCost: conversation?.totalCost || 0
 				},
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 
-		onResult: async (data: any) => {
-			const processingConvId = getProcessingConversationId();
+		onResult: async (data: any, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onResult - convId:', convId);
 
 			// Debug: Log subtype and end-of-turn indicators
 			console.log('[StreamCallbacksFactory] onResult subtype:', data.subtype, 'is_done:', data.is_done, 'stop_reason:', data.stop_reason, 'full data:', JSON.stringify(data).substring(0, 500));
@@ -171,11 +195,11 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			postMessage({
 				type: 'result',
 				data,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 			postMessage({
 				type: 'clearLoading',
-				conversationId: processingConvId
+				conversationId: convId
 			});
 
 			// Extract and send usage info from result
@@ -186,17 +210,15 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			const cacheReadTokens = usage.cache_read_input_tokens || 0;
 			const cost = data.total_cost_usd || 0;
 
-			console.log('[Extension] Result usage data: inputTokens=' + inputTokens + ' outputTokens=' + outputTokens + ' cost=' + cost + ' processingConvId=' + processingConvId);
+			console.log('[Extension] Result usage data: inputTokens=' + inputTokens + ' outputTokens=' + outputTokens + ' cost=' + cost + ' convId=' + convId);
 
-			if (inputTokens || outputTokens || cost) {
+			if ((inputTokens || outputTokens || cost) && convId) {
 				// Update conversation manager for the processing conversation
-				conversationManager.updateUsage(cost, inputTokens, outputTokens, processingConvId);
+				conversationManager.updateUsage(cost, inputTokens, outputTokens, convId);
 
 				// Always send to UI with conversationId - UI will filter
-				const conversation = processingConvId
-					? conversationManager.getConversation(processingConvId)
-					: null;
-				console.log('[Extension] Sending usage to UI: processingConvId=' + processingConvId + ' conversationExists=' + !!conversation + ' totalTokensInput=' + conversation?.totalTokensInput + ' totalTokensOutput=' + conversation?.totalTokensOutput + ' totalCost=' + conversation?.totalCost);
+				const conversation = conversationManager.getConversation(convId);
+				console.log('[Extension] Sending usage to UI: convId=' + convId + ' conversationExists=' + !!conversation + ' totalTokensInput=' + conversation?.totalTokensInput + ' totalTokensOutput=' + conversation?.totalTokensOutput + ' totalCost=' + conversation?.totalCost);
 				postMessage({
 					type: 'usage',
 					data: {
@@ -204,12 +226,14 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 						outputTokens: conversation?.totalTokensOutput || 0,
 						totalCost: conversation?.totalCost || 0
 					},
-					conversationId: processingConvId
+					conversationId: convId
 				});
 			}
 
 			// Auto-save the processing conversation after each response
-			await conversationManager.saveConversation(processingConvId);
+			if (convId) {
+				await conversationManager.saveConversation(convId);
+			}
 
 			// Refresh conversation list to update timestamps
 			sendConversationList();
@@ -237,21 +261,24 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 				postMessage({
 					type: 'setProcessing',
 					data: { isProcessing: false },
-					conversationId: processingConvId
+					conversationId: convId
 				});
 				setProcessingState(false);
 			}
 		},
 
-		onError: (error: string) => {
-			const processingConvId = getProcessingConversationId();
+		onError: (error: string, conversationId?: string) => {
+			const convId = conversationId || getProcessingConversationId();
+			console.log('[StreamCallbacksFactory] onError - convId:', convId);
 			// Always save to conversation
-			conversationManager.addMessage('error', error, processingConvId);
+			if (convId) {
+				conversationManager.addMessage('error', error, convId);
+			}
 			// Always send to UI with conversationId - UI will filter
 			postMessage({
 				type: 'error',
 				data: error,
-				conversationId: processingConvId
+				conversationId: convId
 			});
 		},
 

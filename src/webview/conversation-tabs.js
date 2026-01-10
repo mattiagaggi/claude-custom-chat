@@ -47,6 +47,7 @@ function removeConversationTab(conversationId) {
  * Switch to a specific conversation
  */
 function switchToConversation(conversationId) {
+	console.log('[switchToConversation] Called with:', conversationId, 'current viewed:', window.currentViewedConversationId);
 	if (!activeConversations.has(conversationId)) {
 		console.error('Cannot switch to conversation', conversationId, '- not found');
 		return;
@@ -60,6 +61,22 @@ function switchToConversation(conversationId) {
 	}
 
 	currentActiveConversationId = conversationId;
+
+	// IMMEDIATELY update the viewed conversation ID to prevent messages from
+	// the previous conversation's stream from appearing in this view
+	// This is stored on window so it's shared with message-handler.js
+	window.currentViewedConversationId = conversationId;
+	console.log('[switchToConversation] Set window.currentViewedConversationId =', conversationId);
+
+	// Clear any streaming state from the previous conversation
+	if (window.streamingState && window.streamingState.conversationId !== conversationId) {
+		if (window.streamingState.timeout) {
+			clearTimeout(window.streamingState.timeout);
+		}
+		window.streamingState = null;
+		window.currentStreamingMessageId = null;
+	}
+
 	renderConversationTabs();
 
 	// Send message to extension to switch conversation
@@ -125,15 +142,21 @@ function renderConversationTabs() {
 	// Clear existing tabs
 	tabsList.innerHTML = '';
 
-	// Add clear all button if more than 2 tabs
+	// Add clear all button if 2 or more tabs
 	let clearAllBtn = tabsContainer.querySelector('.clear-all-tabs-btn');
-	if (activeConversations.size > 2) {
+	if (activeConversations.size >= 2) {
 		if (!clearAllBtn) {
+			console.log('[renderConversationTabs] Creating clear all button');
 			clearAllBtn = document.createElement('button');
 			clearAllBtn.className = 'clear-all-tabs-btn';
 			clearAllBtn.title = 'Close all other tabs';
-			clearAllBtn.textContent = '✕ Clear';
-			clearAllBtn.onclick = clearAllTabs;
+			clearAllBtn.textContent = 'Close All';
+			clearAllBtn.addEventListener('click', (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				console.log('[clearAllBtn] Click event fired');
+				clearAllTabs();
+			});
 			tabsContainer.appendChild(clearAllBtn);
 		}
 	} else if (clearAllBtn) {
@@ -162,21 +185,39 @@ function renderConversationTabs() {
 			tab.appendChild(badge);
 		}
 
-		// Processing indicator
+		// Processing indicator with stop button
 		if (conversation.isProcessing) {
 			const processingIndicator = document.createElement('div');
 			processingIndicator.className = 'conversation-tab-processing';
 			tab.appendChild(processingIndicator);
+
+			// Add stop button for processing conversations
+			const stopBtn = document.createElement('span');
+			stopBtn.className = 'conversation-tab-stop';
+			stopBtn.innerHTML = '■';
+			stopBtn.title = 'Stop process';
+			stopBtn.addEventListener('click', (e) => {
+				e.preventDefault();
+				e.stopPropagation();
+				console.log('[stopBtn] Stopping conversation:', conversationId);
+				vscode.postMessage({
+					type: 'stopConversation',
+					conversationId: conversationId
+				});
+			});
+			tab.appendChild(stopBtn);
 		}
 
 		// Close button
 		const closeBtn = document.createElement('span');
 		closeBtn.className = 'conversation-tab-close';
 		closeBtn.innerHTML = '✕';
-		closeBtn.onclick = (e) => {
+		closeBtn.addEventListener('click', (e) => {
+			e.preventDefault();
 			e.stopPropagation();
+			console.log('[closeBtn] Clicked for conversation:', conversationId);
 			closeConversationTab(conversationId);
-		};
+		});
 		tab.appendChild(closeBtn);
 
 		// Click handler to switch conversation
@@ -259,6 +300,8 @@ function handleActiveConversationsList(conversations) {
  * Clear all tabs except the current one
  */
 function clearAllTabs() {
+	console.log('[clearAllTabs] Called, current:', currentActiveConversationId, 'total tabs:', activeConversations.size);
+
 	// Get all conversation IDs except the current one
 	const tabsToClose = [];
 	activeConversations.forEach((_, conversationId) => {
@@ -266,6 +309,8 @@ function clearAllTabs() {
 			tabsToClose.push(conversationId);
 		}
 	});
+
+	console.log('[clearAllTabs] Closing tabs:', tabsToClose);
 
 	// Close each tab
 	tabsToClose.forEach(conversationId => {

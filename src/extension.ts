@@ -129,7 +129,6 @@ class ClaudeChatProvider {
 
 	// State
 	private currentProcess: cp.ChildProcess | undefined;
-	private isProcessing = false;
 	private selectedModel = 'default';
 	private chatNumber: number;
 
@@ -139,8 +138,8 @@ class ClaudeChatProvider {
 	// Streaming state per conversation - accumulated text for replay on visibility/conversation change
 	private conversationStreamingText: Map<string, string> = new Map();
 
-	// Track which conversation has an active process
-	private processingConversationId: string | undefined;
+	// Track which conversations have active processes (supports multiple concurrent processes)
+	private processingConversationIds: Set<string> = new Set();
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
@@ -169,9 +168,10 @@ class ClaudeChatProvider {
 			postMessage: (msg) => this.postMessage(msg),
 			getCurrentConversationId: () => this.currentConversationId,
 			setCurrentConversationId: (id) => { this.currentConversationId = id; },
-			getProcessingConversationId: () => this.processingConversationId,
-			isProcessing: () => this.isProcessing,
-			getStreamingText: (id) => this.conversationStreamingText.get(id)
+			getProcessingConversationId: () => this.currentConversationId && this.processingConversationIds.has(this.currentConversationId) ? this.currentConversationId : undefined,
+			isProcessing: () => this.currentConversationId ? this.processingConversationIds.has(this.currentConversationId) : false,
+			getStreamingText: (id) => this.conversationStreamingText.get(id),
+			getProcessingConversationIds: () => this.processingConversationIds
 		});
 
 		// Initialize stream parser with factory
@@ -180,12 +180,13 @@ class ClaudeChatProvider {
 			context: this.context,
 			postMessage: (msg) => this.postMessage(msg),
 			getCurrentConversationId: () => this.currentConversationId,
-			getProcessingConversationId: () => this.processingConversationId,
-			isProcessing: () => this.isProcessing,
-			setProcessingState: (isProcessing) => {
-				this.isProcessing = isProcessing;
-				if (!isProcessing) {
-					this.processingConversationId = undefined;
+			getProcessingConversationId: () => this.currentConversationId && this.processingConversationIds.has(this.currentConversationId) ? this.currentConversationId : undefined,
+			isProcessing: () => this.processingConversationIds.size > 0,
+			setProcessingState: (isProcessing, conversationId) => {
+				if (isProcessing && conversationId) {
+					this.processingConversationIds.add(conversationId);
+				} else if (!isProcessing && conversationId) {
+					this.processingConversationIds.delete(conversationId);
 				}
 			},
 			getStreamingText: (id) => this.conversationStreamingText.get(id),
@@ -262,10 +263,10 @@ class ClaudeChatProvider {
 	reinitialize() {
 		this.sendReady();
 
-		// If we're viewing the conversation that's currently processing
-		if (this.processingConversationId === this.currentConversationId && this.isProcessing) {
+		// If we're viewing a conversation that's currently processing
+		if (this.currentConversationId && this.processingConversationIds.has(this.currentConversationId)) {
 			// Get accumulated streaming text for this conversation
-			const streamingText = this.conversationStreamingText.get(this.currentConversationId || '');
+			const streamingText = this.conversationStreamingText.get(this.currentConversationId);
 			if (streamingText) {
 				// Send accumulated text as a single chunk so webview can render it
 				this.postMessage({ type: 'streamingReplay', data: streamingText, conversationId: this.currentConversationId });
@@ -337,7 +338,7 @@ class ClaudeChatProvider {
 			onSendMessage: (text: string, planMode?: boolean, thinkingMode?: boolean, skipUIDisplay?: boolean) =>
 				this.sendMessageToClaude(text, planMode, thinkingMode, skipUIDisplay),
 			onNewSession: () => this.newSession(),
-			onStopRequest: () => this.stopProcess(),
+			onStopRequest: () => this.stopCurrentConversationProcess(),
 			onLoadConversation: (filename: string) => this.loadConversation(filename),
 			onSetModel: (model: string) => this.setModel(model),
 			onOpenModelTerminal: () => this.openModelTerminal(),
@@ -368,17 +369,20 @@ class ClaudeChatProvider {
 			onGetActiveConversations: () => this.sendActiveConversations(),
 			onSwitchConversation: (conversationId: string) => this.switchConversation(conversationId),
 			onCloseConversation: (conversationId: string) => this.closeConversation(conversationId),
+			onStopConversation: (conversationId: string) => this.stopConversationProcess(conversationId),
 			onOpenConversationInNewPanel: (filename: string) => this.openConversationInNewPanel(filename)
 		};
 	}
 
 	/**
 	 * Send message to Claude
+	 * Supports concurrent processes - each conversation can have its own running process
 	 */
 	private async sendMessageToClaude(message: string, _planMode?: boolean, thinkingMode?: boolean, skipUIDisplay?: boolean) {
-		// Cancel current operation if running
-		if (this.isProcessing) {
-			await this.stopProcess();
+		// Check if THIS conversation already has a running process
+		// If so, stop it before starting a new one (but don't stop OTHER conversations)
+		if (this.currentConversationId && this.processingConversationIds.has(this.currentConversationId)) {
+			await this.stopConversationProcess(this.currentConversationId);
 			this.sendAndSaveMessage({
 				type: 'assistantMessage',
 				data: '⚠️ _Previous operation cancelled - starting new request..._'
@@ -432,67 +436,80 @@ class ClaudeChatProvider {
 			args.push('--model', this.selectedModel);
 		}
 
-		// Add session resume
-		const session = this.conversationManager.getCurrentSession();
-		if (session.sessionId) {
-			args.push('--resume', session.sessionId);
+		// Add session resume for this conversation
+		const conversation = this.currentConversationId
+			? this.conversationManager.getConversation(this.currentConversationId)
+			: null;
+		const sessionId = conversation?.sessionId;
+		if (sessionId) {
+			args.push('--resume', sessionId);
 		}
 
 		console.log('[Extension] ========== FINAL ARGS CHECK ==========');
 		console.log('[Extension] Complete args array:', JSON.stringify(args, null, 2));
-		console.log('[Extension] Args includes permission-mode:', args.includes('--permission-mode'));
-		console.log('[Extension] Permission mode value:', args[args.indexOf('--permission-mode') + 1]);
+		console.log('[Extension] Conversation ID:', this.currentConversationId);
 
-		this.isProcessing = true;
-		// Track which conversation this process belongs to
-		this.processingConversationId = this.currentConversationId;
+		// Capture the conversation ID at spawn time - this is critical!
+		// The process will continue running with this ID even if user switches conversations
+		const spawnedConversationId = this.currentConversationId;
+
+		if (!spawnedConversationId) {
+			this.postMessage({ type: 'error', data: 'No active conversation' });
+			return;
+		}
+
+		// Track this conversation as processing
+		this.processingConversationIds.add(spawnedConversationId);
 
 		// Show user input (skip if already displayed in UI from queue)
 		if (!skipUIDisplay) {
 			this.sendAndSaveMessage({ type: 'userInput', data: message });
 		} else {
 			// Still save to conversation history, just don't post to UI
-			this.conversationManager.addMessage('userInput', message, this.currentConversationId);
+			this.conversationManager.addMessage('userInput', message, spawnedConversationId);
 		}
 
 		// Save conversation immediately so it appears in history list
 		// This allows user to click back to it while processing
-		await this.conversationManager.saveConversation(this.currentConversationId);
+		await this.conversationManager.saveConversation(spawnedConversationId);
 		this.sendConversationList();
 
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: true }, conversationId: this.currentConversationId });
-		this.postMessage({ type: 'loading', data: 'Claude is working...', conversationId: this.currentConversationId });
+		this.postMessage({ type: 'setProcessing', data: { isProcessing: true }, conversationId: spawnedConversationId });
+		this.postMessage({ type: 'loading', data: 'Claude is working...', conversationId: spawnedConversationId });
+
+		// Update tabs UI to show this conversation is processing
+		this.conversationHandler.sendActiveConversations();
 
 		try {
-			// Spawn process with conversation ID
-			const process = await this.processManager.spawn({
+			// Spawn process for this specific conversation (doesn't affect other conversations)
+			const process = await this.processManager.spawnForConversation({
 				args,
 				cwd,
 				wslEnabled: config.get('wsl.enabled', false),
 				wslDistro: config.get('wsl.distro', 'Ubuntu'),
 				nodePath: config.get('wsl.nodePath', '/usr/bin/node'),
 				claudePath: config.get('wsl.claudePath', '/usr/local/bin/claude')
-			}, this.currentConversationId);
+			}, spawnedConversationId);
 
-			this.currentProcess = process;
-
-			// Write message to stdin
+			// Write message to stdin using conversation-specific write
 			const userMessage = {
 				type: 'user',
-				session_id: session.sessionId || '',
+				session_id: sessionId || '',
 				message: {
 					role: 'user',
 					content: [{ type: 'text', text: message }]
 				},
 				parent_tool_use_id: null
 			};
-			console.log('[Extension] Sending message to Claude:', JSON.stringify(userMessage));
-			this.processManager.write(JSON.stringify(userMessage) + '\n');
+			console.log('[Extension] Sending message to Claude for conversation:', spawnedConversationId);
+			this.processManager.writeToConversation(spawnedConversationId, JSON.stringify(userMessage) + '\n');
 
 			// Handle stdout
+			// IMPORTANT: Capture spawnedConversationId in closure so this process's data
+			// is always associated with the correct conversation, even if user switches tabs
 			process.stdout?.on('data', (data) => {
 				const dataStr = data.toString();
-				console.log('[Extension] Claude stdout received:', dataStr.length, 'bytes');
+				console.log('[Extension] Claude stdout received:', dataStr.length, 'bytes', 'for conversation:', spawnedConversationId);
 				console.log('[Extension] Claude stdout content:', dataStr.substring(0, 200));
 
 				// Log each complete line
@@ -501,56 +518,66 @@ class ClaudeChatProvider {
 					console.log(`[Extension] Line ${idx}:`, line.substring(0, 150));
 				});
 
-				this.streamParser.parseChunk(dataStr);
+				// Pass the conversationId that was captured at spawn time
+				// This ensures data goes to the correct conversation even if user switched tabs
+				this.streamParser.parseChunk(dataStr, spawnedConversationId);
 			});
 
-			// Handle stderr
+			// Handle stderr - use spawnedConversationId for correct conversation association
 			process.stderr?.on('data', (data) => {
 				const error = data.toString();
-				console.error('[Extension] Claude stderr:', error);
+				console.error('[Extension] Claude stderr:', error, 'for conversation:', spawnedConversationId);
 				if (error.trim()) {
-					this.postMessage({ type: 'error', data: `[CLI Error] ${error}`, conversationId: this.processingConversationId });
+					this.postMessage({ type: 'error', data: `[CLI Error] ${error}`, conversationId: spawnedConversationId });
 				}
 			});
 
-			// Handle close
+			// Handle close - use spawnedConversationId for correct conversation association
 			process.on('close', (code) => {
-				console.log('[Extension] Claude process closed with code:', code);
-				this.currentProcess = undefined;
+				console.log('[Extension] Claude process closed with code:', code, 'for conversation:', spawnedConversationId);
+
+				// Remove from processing set
+				this.processingConversationIds.delete(spawnedConversationId);
+
 				// Send with conversationId - webview will filter based on current view
-				const closedConvId = this.processingConversationId;
-				this.postMessage({ type: 'clearLoading', conversationId: closedConvId });
-				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: closedConvId });
-				this.isProcessing = false;
-				this.processingConversationId = undefined;
-				this.permissionManager.cancelAllPending();
+				this.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
+				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: spawnedConversationId });
+
+				// Update tabs UI
+				this.conversationHandler.sendActiveConversations();
 			});
 
-			// Handle error
+			// Handle error - use spawnedConversationId for correct conversation association
 			process.on('error', (error) => {
-				console.error('[Extension] Claude process error:', error);
-				this.currentProcess = undefined;
+				console.error('[Extension] Claude process error:', error, 'for conversation:', spawnedConversationId);
+
+				// Remove from processing set
+				this.processingConversationIds.delete(spawnedConversationId);
+
 				// Send with conversationId - webview will filter based on current view
-				const errorConvId = this.processingConversationId;
-				this.postMessage({ type: 'clearLoading', conversationId: errorConvId });
-				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: errorConvId });
-				this.isProcessing = false;
-				this.processingConversationId = undefined;
+				this.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
+				this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: spawnedConversationId });
+
+				// Update tabs UI
+				this.conversationHandler.sendActiveConversations();
 
 				if (error.message.includes('ENOENT')) {
 					this.postMessage({ type: 'showInstallModal' });
 				} else {
-					this.sendAndSaveMessage({ type: 'error', data: `Error: ${error.message}` });
+					this.postMessage({ type: 'error', data: `Error: ${error.message}`, conversationId: spawnedConversationId });
 				}
 			});
 
 		} catch (error: any) {
-			const catchConvId = this.processingConversationId;
-			this.postMessage({ type: 'clearLoading', conversationId: catchConvId });
-			this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: catchConvId });
-			this.isProcessing = false;
-			this.processingConversationId = undefined;
-			this.sendAndSaveMessage({ type: 'error', data: `Failed to start: ${error.message}` });
+			// Remove from processing set on error
+			this.processingConversationIds.delete(spawnedConversationId);
+
+			this.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
+			this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: spawnedConversationId });
+			this.postMessage({ type: 'error', data: `Failed to start: ${error.message}`, conversationId: spawnedConversationId });
+
+			// Update tabs UI
+			this.conversationHandler.sendActiveConversations();
 		}
 	}
 
@@ -576,29 +603,54 @@ class ClaudeChatProvider {
 	}
 
 	/**
-	 * Stop current process
+	 * Stop the current conversation's process (called from stop button)
 	 */
-	private async stopProcess() {
-		const stoppedConvId = this.processingConversationId;
-		await this.processManager.terminate();
-		this.currentProcess = undefined;
-		this.isProcessing = false;
-		// Finalize any streaming content before clearing
-		if (stoppedConvId) {
-			const streamingText = this.conversationStreamingText.get(stoppedConvId);
-			if (streamingText) {
-				// Save the partial streaming content as a completed message
-				this.conversationManager.addMessage('assistantMessage', streamingText, stoppedConvId);
-				// Notify UI to finalize the streaming display (UI will filter by conversationId)
-				this.postMessage({
-					type: 'finalizeStreaming',
-					data: streamingText,
-					conversationId: stoppedConvId
-				});
-			}
-			this.conversationStreamingText.delete(stoppedConvId);
+	private async stopCurrentConversationProcess() {
+		if (this.currentConversationId && this.processingConversationIds.has(this.currentConversationId)) {
+			await this.stopConversationProcess(this.currentConversationId);
 		}
-		this.processingConversationId = undefined;
+	}
+
+	/**
+	 * Stop a specific conversation's process
+	 */
+	private async stopConversationProcess(conversationId: string) {
+		// Terminate the specific conversation's process
+		await this.processManager.terminateConversation(conversationId);
+
+		// Finalize any streaming content before clearing
+		const streamingText = this.conversationStreamingText.get(conversationId);
+		if (streamingText) {
+			// Save the partial streaming content as a completed message
+			this.conversationManager.addMessage('assistantMessage', streamingText, conversationId);
+			// Notify UI to finalize the streaming display (UI will filter by conversationId)
+			this.postMessage({
+				type: 'finalizeStreaming',
+				data: streamingText,
+				conversationId: conversationId
+			});
+		}
+		this.conversationStreamingText.delete(conversationId);
+
+		// Remove from processing set
+		this.processingConversationIds.delete(conversationId);
+
+		// Update UI
+		this.postMessage({ type: 'clearLoading', conversationId });
+		this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId });
+
+		// Update tabs UI
+		this.conversationHandler.sendActiveConversations();
+	}
+
+	/**
+	 * Stop all processes (used for cleanup)
+	 */
+	private async stopAllProcesses() {
+		const processingIds = Array.from(this.processingConversationIds);
+		for (const convId of processingIds) {
+			await this.stopConversationProcess(convId);
+		}
 		this.permissionManager.cancelAllPending();
 		this.permissionRequestHandler.clearPending();
 	}
@@ -632,15 +684,21 @@ class ClaudeChatProvider {
 
 		// Refresh conversation history
 		this.sendConversationList();
+
+		// Update tabs UI with the new conversation
+		this.sendActiveConversations();
 	}
 
 	/**
 	 * Load conversation (from history)
 	 */
 	async loadConversation(filename: string) {
+		// Check if we're loading a conversation that's currently processing
+		const convIdForFilename = this.conversationManager.getConversationIdForFilename(filename);
+		const isProcessingConv = convIdForFilename ? this.processingConversationIds.has(convIdForFilename) : false;
 		await this.conversationHandler.loadConversation(filename, {
-			isProcessing: this.isProcessing,
-			processingConversationId: this.processingConversationId
+			isProcessing: isProcessingConv,
+			processingConversationId: isProcessingConv ? convIdForFilename : undefined
 		});
 		// Resend any pending permission requests so they appear in the UI
 		this.permissionRequestHandler.resendPendingPermissions();
@@ -667,7 +725,8 @@ class ClaudeChatProvider {
 	 * Send ready message
 	 */
 	private sendReady() {
-		const message = this.isProcessing
+		const isCurrentProcessing = this.currentConversationId && this.processingConversationIds.has(this.currentConversationId);
+		const message = isCurrentProcessing
 			? 'Claude is working...'
 			: 'Ready to chat with Claude Code! Type your message below.';
 		this.postMessage({ type: 'ready', data: message });
@@ -749,7 +808,7 @@ class ClaudeChatProvider {
 		return conversations.map(conv => {
 			const convId = this.conversationManager.getConversationIdForFilename(conv.filename);
 			const isActiveConversation = convId === this.currentConversationId;
-			const isProcessingConversation = this.isProcessing && convId === this.processingConversationId;
+			const isProcessingConversation = convId ? this.processingConversationIds.has(convId) : false;
 			return {
 				...conv,
 				isProcessing: isActiveConversation || isProcessingConversation

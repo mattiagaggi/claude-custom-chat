@@ -7,14 +7,14 @@
  */
 
 // Helper to append to the last Claude message (for streaming responses)
-let currentStreamingMessageId = null;
+// Note: window.currentStreamingMessageId is initialized in state.js
 
 function appendToLastClaudeMessage(content) {
 	const messagesDiv = document.getElementById('messages');
 	const messages = messagesDiv.querySelectorAll('.message.claude');
 	const lastClaudeMessage = messages[messages.length - 1];
 
-	if (lastClaudeMessage && lastClaudeMessage.dataset.streamingId === currentStreamingMessageId) {
+	if (lastClaudeMessage && lastClaudeMessage.dataset.streamingId === window.currentStreamingMessageId) {
 		const contentDiv = lastClaudeMessage.querySelector('.message-content');
 		if (contentDiv) {
 			// Append the new content as HTML
@@ -35,7 +35,7 @@ function replaceStreamingMessageContent(content) {
 	const messages = messagesDiv.querySelectorAll('.message.claude');
 	const lastClaudeMessage = messages[messages.length - 1];
 
-	if (lastClaudeMessage && lastClaudeMessage.dataset.streamingId === currentStreamingMessageId) {
+	if (lastClaudeMessage && lastClaudeMessage.dataset.streamingId === window.currentStreamingMessageId) {
 		const contentDiv = lastClaudeMessage.querySelector('.message-content');
 		if (contentDiv) {
 			// Replace the entire content (for streaming re-render)
@@ -128,7 +128,7 @@ function addMessage(content, type = 'claude') {
 	messagesDiv.appendChild(messageDiv);
 	// Mark Claude messages with streaming ID for appending
 	if (type === 'claude') {
-		messageDiv.dataset.streamingId = currentStreamingMessageId;
+		messageDiv.dataset.streamingId = window.currentStreamingMessageId;
 	}
 	moveProcessingIndicatorToLast();
 	scrollToBottomIfNeeded(messagesDiv, shouldScroll);

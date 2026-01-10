@@ -19,6 +19,11 @@ const imageBtn = document.getElementById('imageBtn');
 
 let isProcessing = false;
 let isExecutingTool = false;
+
+// Conversation state - stored on window for cross-script access
+window.currentViewedConversationId = null;
+window.currentStreamingMessageId = null;
+window.streamingState = null;
 let filteredFiles = [];
 let selectedFileIndex = -1;
 let planModeEnabled = false;

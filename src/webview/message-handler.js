@@ -7,27 +7,50 @@
  * conversationLoaded, setProcessing, loading, error, etc.
  */
 
-// Track which conversation is currently being viewed in this webview
-let currentViewedConversationId = null;
+// Note: window.currentViewedConversationId is initialized in state.js
 
 /**
  * Check if a message is for the currently viewed conversation.
  * Returns true if:
- * - Message has no conversationId (global message)
+ * - Message has no conversationId property at all (legacy/global message)
  * - Message's conversationId matches current viewed conversation
- * - No conversation is currently being viewed (initial state)
+ * Returns false if:
+ * - Message has conversationId property (even if undefined) but doesn't match current view
+ * - Message has a conversationId but we don't know which conversation we're viewing
  */
 function isMessageForCurrentConversation(message) {
-	// Messages without conversationId are global/system messages - always display
+	// Check if conversationId property exists on the message
+	const hasConversationIdProperty = 'conversationId' in message;
+
+	// If the message doesn't have a conversationId property at all,
+	// it's a legacy/global message - always display
+	if (!hasConversationIdProperty) {
+		console.log('[isMessageForCurrentConversation] No conversationId property - accepting legacy message');
+		return true;
+	}
+
+	// From here, the message has the conversationId property (even if the value is undefined)
+
+	// If we don't know which conversation we're viewing, reject messages that have
+	// a conversationId property (even undefined) - this prevents spill-over
+	if (!window.currentViewedConversationId) {
+		console.log('[isMessageForCurrentConversation] No currentViewedConversationId - rejecting');
+		return false;
+	}
+
+	// If message's conversationId is undefined/null, reject it -
+	// we don't know which conversation it belongs to
 	if (!message.conversationId) {
-		return true;
+		console.log('[isMessageForCurrentConversation] Message has undefined conversationId - rejecting');
+		return false;
 	}
-	// If no conversation is being viewed yet, accept all messages
-	if (!currentViewedConversationId) {
-		return true;
-	}
+
 	// Only display messages for the currently viewed conversation
-	return message.conversationId === currentViewedConversationId;
+	const result = message.conversationId === window.currentViewedConversationId;
+	if (!result) {
+		console.log('[isMessageForCurrentConversation] ID mismatch:', message.conversationId, '!==', window.currentViewedConversationId);
+	}
+	return result;
 }
 
 window.addEventListener('message', event => {
@@ -83,7 +106,7 @@ window.addEventListener('message', event => {
 				const parsedContent = parseSimpleMarkdown(displayData);
 				if (!appendToLastClaudeMessage(parsedContent)) {
 					// Start new streaming message
-					currentStreamingMessageId = Date.now().toString();
+					window.currentStreamingMessageId = Date.now().toString();
 					addMessage(parsedContent, 'claude');
 				}
 			}
@@ -96,7 +119,7 @@ window.addEventListener('message', event => {
 			if (!isMessageForCurrentConversation(message)) {
 				break;
 			}
-			currentStreamingMessageId = null;
+			window.currentStreamingMessageId = null;
 			if (message.data && message.data.trim()) {
 				addMessage(parseSimpleMarkdown(message.data), 'claude');
 			}
@@ -106,16 +129,37 @@ window.addEventListener('message', event => {
 		case 'textDelta':
 			// Handle streaming text delta - accumulate full text and re-render
 			// Only process if this is for the currently viewed conversation
+			// IMPORTANT: isMessageForCurrentConversation now rejects messages with undefined conversationId
+			console.log('[textDelta] Checking:', message.conversationId, 'vs viewed:', window.currentViewedConversationId);
 			if (message.data && isMessageForCurrentConversation(message)) {
+				console.log('[textDelta] ACCEPTED');
+				// Store the conversation ID this delta belongs to
+				// At this point, message.conversationId is guaranteed to be defined and match currentViewedConversationId
+				const deltaConversationId = message.conversationId;
+
 				// Initialize streaming state if needed
 				if (!window.streamingState) {
 					window.streamingState = {
 						fullText: '',
 						timeout: null,
-						messageId: null
+						messageId: null,
+						conversationId: deltaConversationId
 					};
 					// Reset tool tracking when text content starts
 					resetToolTracking();
+				}
+
+				// If streaming state is for a different conversation, ignore this delta
+				// Note: We use strict comparison and require both to be truthy
+				if (window.streamingState.conversationId &&
+					deltaConversationId &&
+					window.streamingState.conversationId !== deltaConversationId) {
+					break;
+				}
+
+				// Extra safety: if the streaming state has no conversationId but we do, update it
+				if (!window.streamingState.conversationId && deltaConversationId) {
+					window.streamingState.conversationId = deltaConversationId;
 				}
 
 				// Accumulate the raw text
@@ -124,7 +168,12 @@ window.addEventListener('message', event => {
 				// Debounce the UI update (re-render every 50ms)
 				if (!window.streamingState.timeout) {
 					window.streamingState.timeout = setTimeout(() => {
-						if (window.streamingState && window.streamingState.fullText) {
+						// Double-check we're still viewing the same conversation when timeout fires
+						// Require BOTH to be truthy and matching
+						const streamConvId = window.streamingState?.conversationId;
+						const viewedConvId = window.currentViewedConversationId;
+						if (window.streamingState && window.streamingState.fullText &&
+							streamConvId && viewedConvId && streamConvId === viewedConvId) {
 							const fullText = window.streamingState.fullText;
 							window.streamingState.timeout = null;
 
@@ -135,17 +184,20 @@ window.addEventListener('message', event => {
 							if (!window.streamingState.messageId) {
 								// Start new streaming message
 								window.streamingState.messageId = Date.now().toString();
-								currentStreamingMessageId = window.streamingState.messageId;
+								window.currentStreamingMessageId = window.streamingState.messageId;
 								addMessage(parsedContent, 'claude');
 							} else {
 								// Replace content in existing message
 								// If replace fails (message not found), create a new one
 								if (!replaceStreamingMessageContent(parsedContent)) {
 									// Message with matching ID not found - create new one
-									currentStreamingMessageId = window.streamingState.messageId;
+									window.currentStreamingMessageId = window.streamingState.messageId;
 									addMessage(parsedContent, 'claude');
 								}
 							}
+						} else if (window.streamingState) {
+							// Conversation changed or IDs don't match, just clear the timeout reference
+							window.streamingState.timeout = null;
 						}
 					}, 50);
 				}
@@ -154,7 +206,7 @@ window.addEventListener('message', event => {
 
 		case 'userInput':
 			// Reset streaming for new user message
-			currentStreamingMessageId = null;
+			window.currentStreamingMessageId = null;
 			window.streamingState = null;
 			resetToolTracking();
 			if (message.data.trim()) {
@@ -170,9 +222,10 @@ window.addEventListener('message', event => {
 				window.streamingState = {
 					fullText: message.data,
 					timeout: null,
-					messageId: Date.now().toString()
+					messageId: Date.now().toString(),
+					conversationId: message.conversationId
 				};
-				currentStreamingMessageId = window.streamingState.messageId;
+				window.currentStreamingMessageId = window.streamingState.messageId;
 
 				// Render the accumulated text
 				const parsedContent = parseSimpleMarkdown(message.data);
@@ -235,7 +288,7 @@ window.addEventListener('message', event => {
 						window.streamingState = null;
 					}
 					// Clear streaming message ID so next message creates a fresh element
-					currentStreamingMessageId = null;
+					window.currentStreamingMessageId = null;
 
 					// Send next queued message if any exist
 					if (messageQueue.length > 0) {
@@ -284,19 +337,27 @@ window.addEventListener('message', event => {
 
 		case 'toolUse':
 			// Only display if for current conversation
+			console.log('[toolUse] Checking:', message.conversationId, 'vs viewed:', window.currentViewedConversationId);
 			if (isMessageForCurrentConversation(message)) {
+				console.log('[toolUse] ACCEPTED');
 				isExecutingTool = true;
 				addToolUseMessage(message.data);
 				updateStatusWithTotals();
+			} else {
+				console.log('[toolUse] REJECTED');
 			}
 			break;
 
 		case 'toolResult':
 			// Only display if for current conversation
+			console.log('[toolResult] Checking:', message.conversationId, 'vs viewed:', window.currentViewedConversationId);
 			if (isMessageForCurrentConversation(message)) {
+				console.log('[toolResult] ACCEPTED');
 				isExecutingTool = false;
 				addToolResultMessage(message.data);
 				updateStatusWithTotals();
+			} else {
+				console.log('[toolResult] REJECTED');
 			}
 			break;
 
@@ -485,8 +546,8 @@ window.addEventListener('message', event => {
 		case 'sessionCleared': {
 			// Update the currently viewed conversation ID
 			if (message.conversationId) {
-				currentViewedConversationId = message.conversationId;
-				console.log('[sessionCleared] Set currentViewedConversationId:', currentViewedConversationId);
+				window.currentViewedConversationId = message.conversationId;
+				console.log('[sessionCleared] Set window.currentViewedConversationId:', window.currentViewedConversationId);
 			}
 
 			// Clear the messages display
@@ -494,7 +555,7 @@ window.addEventListener('message', event => {
 			messagesDiv.innerHTML = '';
 
 			// Reset state
-			currentStreamingMessageId = null;
+			window.currentStreamingMessageId = null;
 			window.streamingState = null; // Reset streaming state
 			messageQueue.length = 0; // Clear any queued messages
 
@@ -515,8 +576,8 @@ window.addEventListener('message', event => {
 
 			// Update the currently viewed conversation ID
 			if (message.data && message.data.conversationId) {
-				currentViewedConversationId = message.data.conversationId;
-				console.log('[conversationLoaded] Set currentViewedConversationId:', currentViewedConversationId);
+				window.currentViewedConversationId = message.data.conversationId;
+				console.log('[conversationLoaded] Set window.currentViewedConversationId:', window.currentViewedConversationId);
 			}
 
 			// Reset processing state when loading a non-streaming conversation
@@ -533,7 +594,7 @@ window.addEventListener('message', event => {
 			// Clear current messages
 			const msgDiv = document.getElementById('messages');
 			msgDiv.innerHTML = '';
-			currentStreamingMessageId = null;
+			window.currentStreamingMessageId = null;
 			window.streamingState = null; // Reset streaming state
 			resetToolTracking(); // Reset tool tracking for fresh display
 
@@ -566,9 +627,10 @@ window.addEventListener('message', event => {
 				window.streamingState = {
 					fullText: message.data.streamingText,
 					timeout: null,
-					messageId: Date.now().toString()
+					messageId: Date.now().toString(),
+					conversationId: message.data.conversationId // Include conversationId to prevent cross-talk
 				};
-				currentStreamingMessageId = window.streamingState.messageId;
+				window.currentStreamingMessageId = window.streamingState.messageId;
 				const parsedContent = parseSimpleMarkdown(message.data.streamingText);
 				addMessage(parsedContent, 'claude');
 			}
@@ -613,7 +675,7 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'usage':
-			console.log('[usage] Received message:', message, 'currentViewedConversationId:', currentViewedConversationId);
+			console.log('[usage] Received message:', message, 'window.currentViewedConversationId:', window.currentViewedConversationId);
 			// Only update usage if for current conversation
 			if (isMessageForCurrentConversation(message) && message.data) {
 				console.log('[usage] Processing usage data:', message.data);
@@ -646,8 +708,28 @@ window.addEventListener('message', event => {
 			// Update current active conversation (for tabs UI)
 			currentActiveConversationId = message.conversationId;
 			// Also update the viewed conversation ID (for message filtering)
-			currentViewedConversationId = message.conversationId;
-			console.log('[conversationSwitched] Set currentViewedConversationId:', currentViewedConversationId);
+			window.currentViewedConversationId = message.conversationId;
+			console.log('[conversationSwitched] Set window.currentViewedConversationId:', window.currentViewedConversationId);
+
+			// Clear any pending streaming state from previous conversation
+			if (window.streamingState && window.streamingState.conversationId !== message.conversationId) {
+				if (window.streamingState.timeout) {
+					clearTimeout(window.streamingState.timeout);
+				}
+				window.streamingState = null;
+				window.currentStreamingMessageId = null;
+			}
+
+			// Add conversation to tabs if not present (e.g., when loading from history)
+			if (!activeConversations.has(message.conversationId)) {
+				activeConversations.set(message.conversationId, {
+					id: message.conversationId,
+					title: message.title || 'Chat',
+					hasNewMessages: false,
+					newMessageCount: 0,
+					isProcessing: false
+				});
+			}
 			renderConversationTabs();
 			break;
 

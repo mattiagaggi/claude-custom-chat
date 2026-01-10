@@ -184,6 +184,24 @@ export class ConversationManager {
 	}
 
 	/**
+	 * Remove a conversation from active conversations
+	 */
+	public removeConversation(conversationId: string): boolean {
+		if (!this._conversations.has(conversationId)) {
+			return false;
+		}
+
+		this._conversations.delete(conversationId);
+
+		// If we removed the active conversation, clear the active ID
+		if (this._activeConversationId === conversationId) {
+			this._activeConversationId = undefined;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Add message to specific conversation (or active if not specified)
 	 */
 	public addMessage(messageType: string, data: any, conversationId?: string): void {

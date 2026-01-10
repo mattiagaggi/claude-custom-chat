@@ -18,6 +18,7 @@ export interface ConversationHandlerConfig {
 	getProcessingConversationId: () => string | undefined;
 	isProcessing: () => boolean;
 	getStreamingText: (conversationId: string) => string | undefined;
+	getProcessingConversationIds?: () => Set<string>;
 }
 
 export class ConversationHandler {
@@ -31,7 +32,10 @@ export class ConversationHandler {
 	 * Send active conversations list to webview
 	 */
 	sendActiveConversations() {
-		const { conversationManager, postMessage, getCurrentConversationId, getProcessingConversationId, isProcessing } = this.config;
+		const { conversationManager, postMessage, getCurrentConversationId, getProcessingConversationIds } = this.config;
+
+		// Get processing conversation IDs - use Set if available, otherwise empty set
+		const processingIds = getProcessingConversationIds ? getProcessingConversationIds() : new Set<string>();
 
 		const conversationIds = conversationManager.getActiveConversationIds();
 		const activeConversations = conversationIds.map(id => {
@@ -54,7 +58,7 @@ export class ConversationHandler {
 				newMessageCount: conversation.messages.filter((m: any) =>
 					m.messageType !== 'userInput' && conversation.hasNewMessages
 				).length,
-				isProcessing: isProcessing() && id === getProcessingConversationId()
+				isProcessing: processingIds.has(id)
 			};
 		}).filter(c => c !== null);
 
@@ -68,13 +72,17 @@ export class ConversationHandler {
 	 * Send conversation list with processing state
 	 */
 	private sendConversationList() {
-		const { conversationManager, postMessage, getCurrentConversationId, getProcessingConversationId, isProcessing } = this.config;
+		const { conversationManager, postMessage, getCurrentConversationId, getProcessingConversationIds } = this.config;
+
+		// Get processing conversation IDs - use Set if available, otherwise empty set
+		const processingIds = getProcessingConversationIds ? getProcessingConversationIds() : new Set<string>();
+
 		const conversations = conversationManager.getConversationList();
 		// Show green dot if: conversation is processing OR is the current active conversation
 		const conversationsWithState = conversations.map(conv => {
 			const convId = conversationManager.getConversationIdForFilename(conv.filename);
 			const isActiveConversation = convId === getCurrentConversationId();
-			const isProcessingConversation = isProcessing() && convId === getProcessingConversationId();
+			const isProcessingConversation = convId ? processingIds.has(convId) : false;
 			return {
 				...conv,
 				isProcessing: isActiveConversation || isProcessingConversation
@@ -170,10 +178,13 @@ export class ConversationHandler {
 			});
 		}
 
-		// Notify webview of switch
+		// Notify webview of switch (include title for tab display)
+		const userMessage = conversation.messages.find(m => m.messageType === 'userInput');
+		const title = (userMessage?.data as string)?.substring(0, 30) || 'Chat';
 		postMessage({
 			type: 'conversationSwitched',
-			conversationId: conversationId
+			conversationId: conversationId,
+			title: title
 		});
 	}
 
@@ -201,11 +212,17 @@ export class ConversationHandler {
 				.filter(id => id !== conversationId);
 
 			if (otherConversations.length > 0) {
+				// Switch first, then remove
 				await this.switchConversation(otherConversations[0]);
+				conversationManager.removeConversation(conversationId);
 			} else {
-				// Create a new conversation
+				// Remove first, then create new
+				conversationManager.removeConversation(conversationId);
 				await newSessionCallback();
 			}
+		} else {
+			// Not the active conversation, just remove it
+			conversationManager.removeConversation(conversationId);
 		}
 
 		// Notify the UI
@@ -267,8 +284,9 @@ export class ConversationHandler {
 					conversationId: processingCheck.processingConversationId
 				});
 
-				// Refresh conversation history
+				// Refresh conversation history and tabs
 				this.sendConversationList();
+				this.sendActiveConversations();
 				return;
 			}
 		}
@@ -308,8 +326,9 @@ export class ConversationHandler {
 				}
 			});
 
-			// Refresh conversation history
+			// Refresh conversation history and tabs
 			this.sendConversationList();
+			this.sendActiveConversations();
 		} else {
 			console.error('[ConversationHandler] Failed to load conversation, conversation is null/undefined');
 		}

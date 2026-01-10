@@ -3479,6 +3479,22 @@
     to { transform: rotate(360deg); }
 }
 
+.conversation-tab-stop {
+    cursor: pointer;
+    opacity: 0.6;
+    padding: 2px 4px;
+    font-size: 10px;
+    color: var(--vscode-errorForeground, #f44336);
+    border-radius: 2px;
+    transition: opacity 0.2s, background-color 0.2s;
+    margin-left: 4px;
+}
+
+.conversation-tab-stop:hover {
+    opacity: 1;
+    background-color: rgba(244, 67, 54, 0.2);
+}
+
 /* Conversation item with actions */
 .conversation-item {
     display: flex;
