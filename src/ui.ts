@@ -94,6 +94,9 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 									<path d="M1 2.5l3 3 3-3"></path>
 								</svg>
 							</button>
+							<button class="idea-btn" id="ideaBtn" onclick="showNextIdea()" title="Code improvement suggestions (loading...)" disabled>
+								💡
+							</button>
 						</div>
 						<div class="right-controls">
 							<button class="slash-btn" onclick="showSlashCommandsModal()" title="Slash commands">/</button>

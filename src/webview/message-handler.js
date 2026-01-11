@@ -774,9 +774,20 @@ window.addEventListener('message', event => {
 			break;
 
 		case 'codeSuggestion':
-			// Show code improvement suggestion during idle time
-			if (message.data && isProcessing) {
+			// Show code improvement suggestion
+			if (message.data) {
 				showCodeSuggestion(message.data);
+				// Update button with remaining count
+				if (typeof message.data.remaining === 'number') {
+					updateIdeaButtonCount(message.data.remaining);
+				}
+			}
+			break;
+
+		case 'suggestionsReady':
+			// Enable the idea button when suggestions are ready
+			if (message.data && message.data.count > 0) {
+				enableIdeaButton(message.data.count);
 			}
 			break;
 	}

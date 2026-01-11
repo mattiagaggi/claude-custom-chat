@@ -27,11 +27,23 @@ export class CodeAnalyzer {
 	private isAnalyzing = false;
 	private analysisProcess: ChildProcess | null = null;
 	private shownSuggestionIndices: Set<number> = new Set();
+	private onReadyCallback: (() => void) | null = null;
 
 	constructor(
 		private workspacePath: string,
 		private claudePath: string
 	) {}
+
+	/**
+	 * Set callback to be called when suggestions are ready
+	 */
+	public onReady(callback: () => void): void {
+		this.onReadyCallback = callback;
+		// If already ready, call immediately
+		if (this.hasResults()) {
+			callback();
+		}
+	}
 
 	/**
 	 * Start background analysis of the codebase
@@ -46,23 +58,28 @@ export class CodeAnalyzer {
 		this.isAnalyzing = true;
 		console.log('[CodeAnalyzer] Starting background code analysis...');
 
-		const prompt = `Analyze this codebase and provide exactly 5 actionable improvement suggestions. Focus on:
+		const prompt = `Analyze this codebase thoroughly and provide exactly 100 actionable improvement suggestions. Focus on:
 - Code quality and best practices
 - Performance optimizations
 - Security considerations
 - Architecture improvements
 - Code maintainability
+- Error handling
+- Testing coverage
+- Documentation
+- Accessibility
+- Type safety
 
 For each suggestion, provide:
 1. A short title (max 10 words)
 2. A brief description (1-2 sentences)
 3. Priority (high/medium/low)
-4. Category (quality/performance/security/architecture/maintainability)
+4. Category (quality/performance/security/architecture/maintainability/testing/documentation/accessibility/types)
 
 Format your response as JSON array:
 [{"title": "...", "description": "...", "priority": "high|medium|low", "category": "..."}]
 
-Only output the JSON array, nothing else.`;
+Only output the JSON array, nothing else. Provide exactly 100 suggestions.`;
 
 		const args = [
 			'--print',
@@ -165,10 +182,10 @@ Only output the JSON array, nothing else.`;
 	 * Store validated analysis result
 	 */
 	private storeResult(suggestions: any[]): void {
-		// Validate and normalize suggestions
+		// Validate and normalize suggestions (keep all 100)
 		const validSuggestions: CodeSuggestion[] = suggestions
 			.filter(s => s.title && s.description)
-			.slice(0, 5)
+			.slice(0, 100)
 			.map(s => ({
 				title: String(s.title).substring(0, 100),
 				description: String(s.description).substring(0, 300),
@@ -183,6 +200,11 @@ Only output the JSON array, nothing else.`;
 				workspacePath: this.workspacePath
 			};
 			console.log('[CodeAnalyzer] Analysis complete:', validSuggestions.length, 'suggestions');
+
+			// Notify that suggestions are ready
+			if (this.onReadyCallback) {
+				this.onReadyCallback();
+			}
 		}
 	}
 

@@ -229,6 +229,16 @@ class ClaudeChatProvider {
 		// Use 'claude' command (should be in PATH)
 		this.codeAnalyzer = new CodeAnalyzer(workspaceFolder, 'claude');
 
+		// Set callback to notify UI when suggestions are ready
+		this.codeAnalyzer.onReady(() => {
+			const count = this.codeAnalyzer?.getAllSuggestions().length || 0;
+			console.log('[CodeAnalyzer] Suggestions ready, notifying UI:', count);
+			this.postMessage({
+				type: 'suggestionsReady',
+				data: { count }
+			});
+		});
+
 		// Delay analysis start to not interfere with extension initialization
 		setTimeout(() => {
 			this.codeAnalyzer?.startBackgroundAnalysis();
@@ -251,13 +261,13 @@ class ClaudeChatProvider {
 				!this.suggestionShownThisIdle) {
 
 				const idleTime = Date.now() - this.lastToolCallTime;
-				// Show suggestion after 3 seconds of no tool activity
-				if (idleTime >= 3000) {
+				// Show suggestion after 1 second of no tool activity
+				if (idleTime >= 1000) {
 					this.showNextSuggestion();
 					this.suggestionShownThisIdle = true;
 				}
 			}
-		}, 1000);
+		}, 500);
 	}
 
 	/**
@@ -427,6 +437,8 @@ class ClaudeChatProvider {
 				return this.selectImageFile();
 			case 'copyToClipboard':
 				return vscode.env.clipboard.writeText(message.text);
+			case 'requestNextSuggestion':
+				return this.showNextSuggestion();
 		}
 
 		// Delegate to message handler

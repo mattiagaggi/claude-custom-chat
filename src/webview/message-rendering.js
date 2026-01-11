@@ -266,3 +266,32 @@ function showCodeSuggestion(data) {
 		messagesDiv.scrollTop = messagesDiv.scrollHeight;
 	}
 }
+
+/**
+ * Request the next code suggestion from the extension
+ */
+function showNextIdea() {
+	vscode.postMessage({ type: 'requestNextSuggestion' });
+}
+
+/**
+ * Enable the idea button when suggestions are ready
+ */
+function enableIdeaButton(count) {
+	const ideaBtn = document.getElementById('ideaBtn');
+	if (ideaBtn) {
+		ideaBtn.disabled = false;
+		ideaBtn.title = `Code improvement suggestions (${count} available)`;
+		ideaBtn.classList.add('ready');
+	}
+}
+
+/**
+ * Update the idea button tooltip with remaining count
+ */
+function updateIdeaButtonCount(remaining) {
+	const ideaBtn = document.getElementById('ideaBtn');
+	if (ideaBtn && !ideaBtn.disabled) {
+		ideaBtn.title = `Code improvement suggestions (${remaining} remaining)`;
+	}
+}
