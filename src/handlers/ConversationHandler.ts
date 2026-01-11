@@ -152,6 +152,8 @@ export class ConversationHandler {
 					input: conversation.totalTokensInput,
 					output: conversation.totalTokensOutput
 				},
+				currentContextUsed: conversation.currentContextUsed || 0,
+				contextWindow: conversation.contextWindow || 200000,
 				streamingText: streamingText || null
 			}
 		});
@@ -275,6 +277,8 @@ export class ConversationHandler {
 							input: processingConv.totalTokensInput,
 							output: processingConv.totalTokensOutput
 						},
+						currentContextUsed: processingConv.currentContextUsed || 0,
+						contextWindow: processingConv.contextWindow || 200000,
 						streamingText: streamingText || null
 					}
 				});

@@ -2487,6 +2487,34 @@
         flex-shrink: 0;
     }
 
+    /* Context usage indicator */
+    .context-usage {
+        font-weight: 500;
+        padding: 1px 6px;
+        border-radius: 8px;
+        font-size: 11px;
+    }
+
+    .context-usage.context-ok {
+        color: var(--vscode-terminal-ansiGreen, #89d185);
+    }
+
+    .context-usage.context-warning {
+        color: var(--vscode-terminal-ansiYellow, #cca700);
+        background: rgba(204, 167, 0, 0.15);
+    }
+
+    .context-usage.context-critical {
+        color: var(--vscode-terminal-ansiRed, #f14c4c);
+        background: rgba(241, 76, 76, 0.15);
+        animation: pulse-warning 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-warning {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.7; }
+    }
+
     pre {
         white-space: pre-wrap;
         word-wrap: break-word;

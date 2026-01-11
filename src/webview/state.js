@@ -19,6 +19,7 @@ const imageBtn = document.getElementById('imageBtn');
 
 let isProcessing = false;
 let isExecutingTool = false;
+let readyMessageShown = false;
 
 // Conversation state - stored on window for cross-script access
 window.currentViewedConversationId = null;
@@ -35,6 +36,8 @@ let customSnippetsData = {};
 let totalTokensInput = 0;
 let totalTokensOutput = 0;
 let totalCost = 0;
+let contextWindow = 200000; // Default 200k context window
+let currentContextUsed = 0; // Actual context used this turn (input + cache)
 let requestCount = 0;
 let subscriptionType = null;
 let requestStartTime = null;

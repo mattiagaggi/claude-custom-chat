@@ -58,7 +58,11 @@ window.addEventListener('message', event => {
 
 	switch (message.type) {
 		case 'ready':
-			addMessage(message.data, 'system');
+			// Only show ready message once per session to avoid duplicates
+			if (!readyMessageShown) {
+				addMessage(message.data, 'system');
+				readyMessageShown = true;
+			}
 			updateStatusWithTotals();
 			break;
 
@@ -653,13 +657,17 @@ window.addEventListener('message', event => {
 				totalTokensOutput = 0;
 			}
 			totalCost = message.data.totalCost || 0;
+			// Reset context usage - will be updated when next response comes in
+			// Context is a per-turn value, not stored in conversation
+			currentContextUsed = message.data.currentContextUsed || 0;
+			contextWindow = message.data.contextWindow || 200000;
 			// Calculate request count from user messages (each userInput = 1 request)
 			if (message.data.messages) {
 				requestCount = message.data.messages.filter(m => m.messageType === 'userInput').length;
 			} else {
 				requestCount = message.data.requestCount || 0;
 			}
-			console.log('[conversationLoaded] Updated usage:', { totalTokensInput, totalTokensOutput, totalCost, requestCount });
+			console.log('[conversationLoaded] Updated usage:', { totalTokensInput, totalTokensOutput, totalCost, currentContextUsed, contextWindow, requestCount });
 			updateStatusWithTotals();
 
 			// Scroll to bottom
@@ -686,12 +694,20 @@ window.addEventListener('message', event => {
 				totalTokensInput = message.data.inputTokens || 0;
 				totalTokensOutput = message.data.outputTokens || 0;
 				totalCost = message.data.totalCost || 0;
+				// Update context window if provided
+				if (message.data.contextWindow) {
+					contextWindow = message.data.contextWindow;
+				}
+				// Update current context used (actual context this turn including cache)
+				if (message.data.currentContextUsed !== undefined) {
+					currentContextUsed = message.data.currentContextUsed;
+				}
 				// Only set requestCount if explicitly provided (e.g., initial load or conversation switch)
 				// Don't increment on streaming updates - requestCount is incremented when user sends a message
 				if (message.data.requestCount !== undefined) {
 					requestCount = message.data.requestCount;
 				}
-				console.log('[usage] Updated totals:', { totalTokensInput, totalTokensOutput, totalCost, requestCount });
+				console.log('[usage] Updated totals:', { totalTokensInput, totalTokensOutput, totalCost, contextWindow, currentContextUsed, requestCount });
 				updateStatusWithTotals();
 			} else {
 				console.log('[usage] Skipped - not for current conversation or no data');

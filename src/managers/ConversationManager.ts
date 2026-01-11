@@ -32,6 +32,8 @@ interface ConversationState {
 	totalCost: number;
 	totalTokensInput: number;
 	totalTokensOutput: number;
+	currentContextUsed: number;  // Context tokens used in last turn
+	contextWindow: number;       // Context window size (e.g., 200000)
 	filename?: string;
 	isActive: boolean;
 	hasNewMessages: boolean;
@@ -62,6 +64,8 @@ export class ConversationManager {
 			totalCost: 0,
 			totalTokensInput: 0,
 			totalTokensOutput: 0,
+			currentContextUsed: 0,
+			contextWindow: 200000,
 			isActive: true,
 			hasNewMessages: false
 		});
@@ -112,6 +116,8 @@ export class ConversationManager {
 			totalCost: 0,
 			totalTokensInput: 0,
 			totalTokensOutput: 0,
+			currentContextUsed: 0,
+			contextWindow: 200000,
 			isActive: true,
 			hasNewMessages: false
 		});
@@ -239,6 +245,20 @@ export class ConversationManager {
 	}
 
 	/**
+	 * Update context usage for specific conversation (or active if not specified)
+	 */
+	public updateContextUsage(currentContextUsed: number, contextWindow: number, conversationId?: string): void {
+		const targetId = conversationId || this._activeConversationId;
+		if (!targetId) return;
+
+		const conversation = this._conversations.get(targetId);
+		if (!conversation) return;
+
+		conversation.currentContextUsed = currentContextUsed;
+		conversation.contextWindow = contextWindow;
+	}
+
+	/**
 	 * Save specific conversation to file (or active if not specified)
 	 */
 	public async saveConversation(conversationId?: string): Promise<void> {
@@ -256,7 +276,7 @@ export class ConversationManager {
 		const filename = conversation.filename || `conversation-${Date.now()}.json`;
 		const filepath = path.join(this._conversationsPath, filename);
 
-		const conversationData: ConversationData = {
+		const conversationData: ConversationData & { currentContextUsed?: number; contextWindow?: number } = {
 			sessionId: conversation.sessionId || '',
 			startTime: conversation.startTime,
 			endTime: new Date().toISOString(),
@@ -266,6 +286,8 @@ export class ConversationManager {
 				input: conversation.totalTokensInput,
 				output: conversation.totalTokensOutput
 			},
+			currentContextUsed: conversation.currentContextUsed,
+			contextWindow: conversation.contextWindow,
 			messages: conversation.messages,
 			filename
 		};
@@ -474,6 +496,8 @@ export class ConversationManager {
 				totalCost: conversationData.totalCost || 0,
 				totalTokensInput: totalTokens.input || 0,
 				totalTokensOutput: totalTokens.output || 0,
+				currentContextUsed: (conversationData as any).currentContextUsed || 0,
+				contextWindow: (conversationData as any).contextWindow || 200000,
 				filename: filename,
 				isActive: true,
 				hasNewMessages: false

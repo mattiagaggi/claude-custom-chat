@@ -84,9 +84,45 @@ function updateStatusWithTotals() {
 		const tokensStr = formatTokensStr(totalTokensInput, totalTokensOutput);
 		const requestStr = requestCount > 0 ? `${requestCount} requests` : '';
 
-		const statusText = `Ready • ${tokensStr}${requestStr ? ` • ${requestStr}` : ''} • ${usageStr}`;
+		// Calculate context usage (use actual context from this turn, not cumulative tokens)
+		const contextStr = formatContextUsage(currentContextUsed, contextWindow);
+
+		const statusText = `Ready • ${tokensStr}${requestStr ? ` • ${requestStr}` : ''} • ${contextStr} • ${usageStr}`;
 		updateStatusHtml(statusText, 'ready');
 	}
+}
+
+/**
+ * Format context window usage for display
+ * Shows percentage and warns if over 80%
+ */
+function formatContextUsage(inputTokens, maxContext) {
+	if (!maxContext || maxContext === 0) {
+		return '';
+	}
+
+	const percentage = Math.min(100, Math.round((inputTokens / maxContext) * 100));
+	const formatNum = (n) => {
+		if (n >= 1000000) return (n / 1000000).toFixed(0) + 'M';
+		if (n >= 1000) return (n / 1000).toFixed(0) + 'k';
+		return n.toString();
+	};
+
+	const usedStr = formatNum(inputTokens);
+	const maxStr = formatNum(maxContext);
+
+	// Determine color based on usage
+	let colorClass = 'context-ok';
+	let warningIcon = '';
+	if (percentage >= 90) {
+		colorClass = 'context-critical';
+		warningIcon = ' ⚠️';
+	} else if (percentage >= 80) {
+		colorClass = 'context-warning';
+		warningIcon = ' ⚡';
+	}
+
+	return `<span class="context-usage ${colorClass}" title="Context window: ${inputTokens.toLocaleString()} / ${maxContext.toLocaleString()} tokens (${percentage}%)">${usedStr}/${maxStr}${warningIcon}</span>`;
 }
 
 /**

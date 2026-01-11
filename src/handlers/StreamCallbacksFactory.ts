@@ -208,13 +208,36 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 			const inputTokens = data.input_tokens || usage.input_tokens || 0;
 			const outputTokens = data.output_tokens || usage.output_tokens || 0;
 			const cacheReadTokens = usage.cache_read_input_tokens || 0;
+			const cacheCreationTokens = usage.cache_creation_input_tokens || 0;
 			const cost = data.total_cost_usd || 0;
 
-			console.log('[Extension] Result usage data: inputTokens=' + inputTokens + ' outputTokens=' + outputTokens + ' cost=' + cost + ' convId=' + convId);
+			// Calculate current context usage for this turn
+			// Context includes both input and output tokens because:
+			// - Input: what we sent to Claude this turn (input_tokens + cached tokens)
+			// - Output: Claude's response, which becomes part of context for next turn
+			// This gives the best estimate of how much context will be used on the NEXT turn
+			const currentContextUsed = inputTokens + cacheReadTokens + cacheCreationTokens + outputTokens;
+
+			// Extract context window from modelUsage (if available)
+			// modelUsage contains per-model stats including contextWindow
+			let contextWindow = 200000; // Default to 200k
+			if (data.modelUsage) {
+				// Get context window from any model in modelUsage
+				for (const modelName of Object.keys(data.modelUsage)) {
+					if (data.modelUsage[modelName]?.contextWindow) {
+						contextWindow = data.modelUsage[modelName].contextWindow;
+						break;
+					}
+				}
+			}
+
+			console.log('[Extension] Result usage data: inputTokens=' + inputTokens + ' outputTokens=' + outputTokens + ' cacheRead=' + cacheReadTokens + ' cacheCreation=' + cacheCreationTokens + ' currentContext=' + currentContextUsed + ' contextWindow=' + contextWindow + ' cost=' + cost + ' convId=' + convId);
 
 			if ((inputTokens || outputTokens || cost) && convId) {
 				// Update conversation manager for the processing conversation
 				conversationManager.updateUsage(cost, inputTokens, outputTokens, convId);
+				// Update context usage
+				conversationManager.updateContextUsage(currentContextUsed, contextWindow, convId);
 
 				// Always send to UI with conversationId - UI will filter
 				const conversation = conversationManager.getConversation(convId);
@@ -224,7 +247,9 @@ export function createStreamCallbacks(config: StreamCallbacksConfig): StreamCall
 					data: {
 						inputTokens: conversation?.totalTokensInput || 0,
 						outputTokens: conversation?.totalTokensOutput || 0,
-						totalCost: conversation?.totalCost || 0
+						totalCost: conversation?.totalCost || 0,
+						contextWindow: contextWindow,
+						currentContextUsed: currentContextUsed  // Actual context this turn
 					},
 					conversationId: convId
 				});
