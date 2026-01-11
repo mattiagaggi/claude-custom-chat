@@ -257,7 +257,7 @@ class ClaudeChatProvider {
 					this.suggestionShownThisIdle = true;
 				}
 			}
-		}, 2000);
+		}, 1000);
 	}
 
 	/**
