@@ -498,8 +498,17 @@ class ClaudeChatProvider {
 			return;
 		}
 
-		// Fallback: try running as claude command
-		await this.runClaudeCommandInChat([command]);
+		// Fallback: unknown command - show available commands
+		const availableCommands = [
+			...Object.keys(cliCommands),
+			'clear', 'cost', 'usage',
+			...terminalCommands,
+			...promptCommands
+		].sort().join(', ');
+		this.postMessage({
+			type: 'assistantMessage',
+			data: `Unknown command \`/${command}\`. Available commands: ${availableCommands}`
+		});
 	}
 
 	/**
