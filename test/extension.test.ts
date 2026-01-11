@@ -10,11 +10,11 @@ suite('Extension Test Suite', () => {
 	vscode.window.showInformationMessage('Start all tests.');
 
 	test('Extension should be present', () => {
-		assert.ok(vscode.extensions.getExtension('AndrePimenta.claude-code-chat'));
+		assert.ok(vscode.extensions.getExtension('Mattia Gaggi.claude-code-chat'));
 	});
 
 	test('Extension should activate', async () => {
-		const ext = vscode.extensions.getExtension('AndrePimenta.claude-code-chat');
+		const ext = vscode.extensions.getExtension('Mattia Gaggi.claude-code-chat');
 		if (ext) {
 			await ext.activate();
 			assert.strictEqual(ext.isActive, true);

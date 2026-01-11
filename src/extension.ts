@@ -272,7 +272,7 @@ class ClaudeChatProvider {
 			onOpenModelTerminal: () => openTerminal('Claude Model', 'claude --help'),
 			onOpenUsageTerminal: (t: string) => openTerminal('Claude Usage', `claude usage ${t}`),
 			onRunInstallCommand: () => openTerminal('Install Claude', 'npm install -g @anthropic/claude'),
-			onExecuteSlashCommand: (c: string) => this.postMessage({ type: 'slashCommandExecuted', data: { command: c } }),
+			onExecuteSlashCommand: (c: string) => this.sendMessageToClaude(`/${c}`),
 			onOpenDiff: utilOpenDiff,
 			onOpenFile: utilOpenFile,
 			onSelectImage: async () => { const p = await utilSelectImage(); if (p) this.postMessage({ type: 'imageSelected', data: p }); },

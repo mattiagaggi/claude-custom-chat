@@ -3,11 +3,11 @@
   "displayName": "Chat for Claude Code",
   "description": "Beautiful Claude Code Chat Interface for VS Code",
   "version": "1.1.0",
-  "publisher": "AndrePimenta",
-  "author": "Andre Pimenta",
+  "publisher": "Mattia Gaggi",
+  "author": "Mattia Gaggi",
   "repository": {
     "type": "git",
-    "url": "https://github.com/andrepimenta/claude-code-chat"
+    "url": "https://github.com/mattiagaggi/claude-code-chat"
   },
   "license": "SEE LICENSE IN LICENSE",
   "engines": {
