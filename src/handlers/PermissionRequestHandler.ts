@@ -13,6 +13,7 @@ export interface PermissionRequestHandlerConfig {
 	permissionManager: PermissionManager;
 	processManager: ProcessManager;
 	postMessage: (message: any) => void;
+	onEditPermissionRequest?: (filePath: string, oldString: string, newString: string) => void;
 }
 
 export class PermissionRequestHandler {
@@ -49,6 +50,11 @@ export class PermissionRequestHandler {
 
 		// Store pending request with conversationId
 		this.pendingPermissions.set(request_id, { ...requestData, conversationId });
+
+		// For Edit tool, open the file and highlight the changes
+		if (tool_name === 'Edit' && input?.file_path && input?.old_string && input?.new_string) {
+			this.config.onEditPermissionRequest?.(input.file_path, input.old_string, input.new_string);
+		}
 
 		// Show UI prompt
 		this.config.postMessage({

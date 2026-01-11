@@ -164,7 +164,8 @@ class ClaudeChatProvider {
 		this.permissionRequestHandler = new PermissionRequestHandler({
 			permissionManager: this.permissionManager,
 			processManager: this.processManager,
-			postMessage: (msg) => this.postMessage(msg)
+			postMessage: (msg) => this.postMessage(msg),
+			onEditPermissionRequest: (filePath, oldString, newString) => this.openFileWithEditHighlight(filePath, oldString, newString)
 		});
 		this.messageHandler = new WebviewMessageHandler(context, this.createMessageCallbacks());
 
@@ -250,8 +251,8 @@ class ClaudeChatProvider {
 				!this.suggestionShownThisIdle) {
 
 				const idleTime = Date.now() - this.lastToolCallTime;
-				// Show suggestion after 10 seconds of no tool activity
-				if (idleTime >= 10000) {
+				// Show suggestion after 3 seconds of no tool activity
+				if (idleTime >= 3000) {
 					this.showNextSuggestion();
 					this.suggestionShownThisIdle = true;
 				}
@@ -281,10 +282,14 @@ class ClaudeChatProvider {
 	 * Show the next code improvement suggestion to the user
 	 */
 	private showNextSuggestion(): void {
-		if (!this.codeAnalyzer) return;
+		if (!this.codeAnalyzer) {
+			return;
+		}
 
 		const suggestion = this.codeAnalyzer.getNextSuggestion();
-		if (!suggestion) return;
+		if (!suggestion) {
+			return;
+		}
 
 		const remaining = this.codeAnalyzer.getRemainingCount();
 
@@ -1037,6 +1042,69 @@ class ClaudeChatProvider {
 
 	private openFile(filePath: string) {
 		utilOpenFile(filePath);
+	}
+
+	/**
+	 * Open a file and highlight the lines that will be edited
+	 * Called when Claude requests permission to edit a file
+	 */
+	private async openFileWithEditHighlight(filePath: string, oldString: string, _newString: string) {
+		try {
+			const uri = vscode.Uri.file(filePath);
+			const document = await vscode.workspace.openTextDocument(uri);
+			const editor = await vscode.window.showTextDocument(document, {
+				viewColumn: vscode.ViewColumn.One,
+				preserveFocus: false, // Focus on the editor
+				preview: false // Open as a permanent tab
+			});
+
+			// Find the old string in the document
+			const text = document.getText();
+			const startIndex = text.indexOf(oldString);
+
+			if (startIndex !== -1) {
+				// Calculate start and end positions
+				const startPos = document.positionAt(startIndex);
+				const endPos = document.positionAt(startIndex + oldString.length);
+
+				// Create a range for the text that will be changed
+				const range = new vscode.Range(startPos, endPos);
+
+				// Select and reveal the range
+				editor.selection = new vscode.Selection(startPos, endPos);
+				editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+
+				// Add a decoration to highlight the lines that will change
+				const decorationType = vscode.window.createTextEditorDecorationType({
+					backgroundColor: new vscode.ThemeColor('diffEditor.removedTextBackground'),
+					isWholeLine: true,
+					overviewRulerColor: new vscode.ThemeColor('editorOverviewRuler.deletedForeground'),
+					overviewRulerLane: vscode.OverviewRulerLane.Full
+				});
+
+				// Expand to full lines for the highlight
+				const fullLineRange = new vscode.Range(
+					new vscode.Position(startPos.line, 0),
+					new vscode.Position(endPos.line, document.lineAt(endPos.line).text.length)
+				);
+
+				editor.setDecorations(decorationType, [fullLineRange]);
+
+				// Clear the decoration after a delay or when selection changes
+				const disposable = vscode.window.onDidChangeTextEditorSelection(() => {
+					decorationType.dispose();
+					disposable.dispose();
+				});
+
+				// Also clear after 30 seconds as a fallback
+				setTimeout(() => {
+					decorationType.dispose();
+					disposable.dispose();
+				}, 30000);
+			}
+		} catch (error) {
+			console.error('[openFileWithEditHighlight] Error:', error);
+		}
 	}
 
 	private async selectImage() {
