@@ -23,8 +23,14 @@ messageInput.addEventListener('input', () => {
 
 // Keyboard shortcuts
 messageInput.addEventListener('keydown', (e) => {
+	// Handle slash autocomplete keyboard navigation first
+	if (handleSlashAutocompleteKeydown(e)) {
+		return;
+	}
+
 	if (e.key === 'Enter' && !e.shiftKey) {
 		e.preventDefault();
+		hideSlashAutocomplete();
 		const sendBtn = document.getElementById('sendBtn');
 		if (sendBtn.disabled) return;
 		sendMessage();
@@ -32,9 +38,14 @@ messageInput.addEventListener('keydown', (e) => {
 		setTimeout(() => {
 			showFilePicker();
 		}, 0);
-	} else if (e.key === 'Escape' && filePickerModal.style.display === 'flex') {
-		e.preventDefault();
-		hideFilePicker();
+	} else if (e.key === 'Escape') {
+		if (slashAutocompleteVisible) {
+			e.preventDefault();
+			hideSlashAutocomplete();
+		} else if (filePickerModal.style.display === 'flex') {
+			e.preventDefault();
+			hideFilePicker();
+		}
 	} else if (e.key === 'v' && (e.ctrlKey || e.metaKey)) {
 		setTimeout(() => {
 			const currentValue = messageInput.value;
@@ -203,8 +214,17 @@ document.addEventListener('click', function(event) {
 	}
 });
 
-// Slash command detection removed - users can type /commands directly in the chat
-// The slash commands modal can still be opened via the "/" button in the UI
+// Slash command autocomplete - show dropdown when typing /
+messageInput.addEventListener('input', () => {
+	checkSlashAutocomplete();
+});
+
+// Hide autocomplete when input loses focus (with delay to allow click on items)
+messageInput.addEventListener('blur', () => {
+	setTimeout(() => {
+		hideSlashAutocomplete();
+	}, 200);
+});
 
 // WSL options visibility
 document.getElementById('wsl-enabled').addEventListener('change', function() {

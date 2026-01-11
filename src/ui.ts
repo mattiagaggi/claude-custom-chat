@@ -67,6 +67,12 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		
 		<div class="input-container" id="inputContainer">
+			<!-- Slash command autocomplete dropdown -->
+			<div id="slashAutocomplete" class="slash-autocomplete" style="display: none;">
+				<div class="slash-autocomplete-list" id="slashAutocompleteList">
+					<!-- Commands will be populated dynamically -->
+				</div>
+			</div>
 			<div class="input-modes">
 				<div class="mode-toggle">
 					<span onclick="togglePlanMode()">Plan First</span>
@@ -806,6 +812,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		<script src="${scriptUri.replace('script.js', 'permissions.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'mcp-servers.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'modals.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'slash-autocomplete.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'message-handler.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'event-listeners.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'init.js')}"></script>
