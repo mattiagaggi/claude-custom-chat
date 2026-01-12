@@ -10,24 +10,103 @@
  * Each conversation has its own buffer, message content, and tool mappings.
  */
 
+// Tools that should not display in the tool UI (handled separately)
+const HIDDEN_TOOLS = new Set(['AskUserQuestion']);
+
 export interface StreamCallbacks {
 	onSessionStart?: (sessionId: string, conversationId?: string) => void;
-	onToolUse?: (data: any, conversationId?: string) => void;
-	onToolResult?: (data: any, conversationId?: string) => void;
+	onToolUse?: (data: ToolUseData, conversationId?: string) => void;
+	onToolResult?: (data: ToolResultData, conversationId?: string) => void;
 	onTextDelta?: (text: string, conversationId?: string) => void;
 	onMessage?: (content: string, conversationId?: string) => void;
 	onTokenUsage?: (inputTokens: number, outputTokens: number, conversationId?: string) => void;
 	onCostUpdate?: (cost: number, conversationId?: string) => void;
-	onResult?: (data: any, conversationId?: string) => void;
+	onResult?: (data: ResultData, conversationId?: string) => void;
 	onError?: (error: string, conversationId?: string) => void;
-	onAccountInfo?: (info: any) => void;
-	onControlRequest?: (request: any, conversationId?: string) => void;
-	onControlResponse?: (response: any) => void;
+	onAccountInfo?: (info: AccountInfo) => void;
+	onControlRequest?: (request: ControlRequest, conversationId?: string) => void;
+	onControlResponse?: (response: ControlResponse) => void;
 }
 
-/**
- * Per-conversation parser state
- */
+export interface ToolUseData {
+	toolName: string;
+	toolInfo: string;
+	rawInput: unknown;
+	id: string;
+}
+
+export interface ToolResultData {
+	toolName: string;
+	content: string;
+	isError: boolean;
+	tool_use_id: string;
+}
+
+export interface ResultData {
+	type: 'result';
+	subtype?: string;
+	is_error?: boolean;
+	result?: string;
+	usage?: UsageData;
+	input_tokens?: number;
+	output_tokens?: number;
+	total_cost_usd?: number;
+	stop_reason?: string;
+	[key: string]: unknown;
+}
+
+interface UsageData {
+	input_tokens?: number;
+	output_tokens?: number;
+	cache_read_input_tokens?: number;
+	cache_creation_input_tokens?: number;
+}
+
+interface AccountInfo {
+	subscription_type?: string;
+	[key: string]: unknown;
+}
+
+interface ControlRequest {
+	type: 'control_request';
+	request_id: string;
+	request?: {
+		tool_name?: string;
+		input?: unknown;
+	};
+	[key: string]: unknown;
+}
+
+interface ControlResponse {
+	type: 'control_response';
+	[key: string]: unknown;
+}
+
+interface StreamEventData {
+	type: 'stream_event';
+	event?: {
+		type: string;
+		delta?: {
+			type: string;
+			text?: string;
+		};
+	};
+}
+
+interface AssistantMessageData {
+	type: 'assistant';
+	message?: {
+		content?: Array<{
+			type: string;
+			name?: string;
+			id?: string;
+			input?: unknown;
+			text?: string;
+		}>;
+		usage?: UsageData;
+	};
+}
+
 interface ConversationParserState {
 	buffer: string;
 	currentMessageContent: string;
@@ -37,17 +116,70 @@ interface ConversationParserState {
 }
 
 export class StreamParser {
-	// Per-conversation state - isolates each conversation's parsing
-	private conversationStates: Map<string, ConversationParserState> = new Map();
-
-	// Fallback state for when no conversationId is provided (legacy behavior)
+	private conversationStates = new Map<string, ConversationParserState>();
 	private defaultState: ConversationParserState = this.createEmptyState();
 
 	constructor(private callbacks: StreamCallbacks) {}
 
+	// ============================================================
+	// Public API
+	// ============================================================
+
 	/**
-	 * Create empty parser state for a conversation
+	 * Parse incoming chunk of data for a specific conversation
 	 */
+	public parseChunk(chunk: string, conversationId?: string): void {
+		const state = this.getState(conversationId);
+
+		console.log('[StreamParser] Received chunk:', chunk.length, 'bytes', 'for conversation:', conversationId);
+		state.buffer += chunk;
+
+		const lines = state.buffer.split('\n');
+		state.buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+		console.log('[StreamParser] Processing', lines.length, 'complete lines, buffer has', state.buffer.length, 'bytes remaining');
+
+		for (const line of lines) {
+			if (line.trim()) {
+				this.processLine(line, conversationId, state);
+			}
+		}
+	}
+
+	/**
+	 * Reset parser state for a specific conversation
+	 */
+	public resetConversation(conversationId: string): void {
+		this.conversationStates.delete(conversationId);
+	}
+
+	/**
+	 * Reset all parser state
+	 */
+	public reset(): void {
+		this.conversationStates.clear();
+		this.defaultState = this.createEmptyState();
+	}
+
+	/**
+	 * Get current accumulated message content for a conversation
+	 */
+	public getCurrentMessage(conversationId?: string): string {
+		return this.getState(conversationId).currentMessageContent;
+	}
+
+	/** @deprecated Use parseChunk(chunk, conversationId) instead */
+	public setConversationContext(_conversationId: string | undefined): void {}
+
+	/** @deprecated Conversation context is now managed per-call */
+	public getConversationContext(): string | undefined {
+		return undefined;
+	}
+
+	// ============================================================
+	// State Management
+	// ============================================================
+
 	private createEmptyState(): ConversationParserState {
 		return {
 			buffer: '',
@@ -58,9 +190,6 @@ export class StreamParser {
 		};
 	}
 
-	/**
-	 * Get or create state for a conversation
-	 */
 	private getState(conversationId?: string): ConversationParserState {
 		if (!conversationId) {
 			return this.defaultState;
@@ -74,276 +203,255 @@ export class StreamParser {
 		return state;
 	}
 
-	/**
-	 * Parse incoming chunk of data for a specific conversation
-	 */
-	public parseChunk(chunk: string, conversationId?: string): void {
-		const state = this.getState(conversationId);
+	// ============================================================
+	// Line Processing
+	// ============================================================
 
-		console.log('[StreamParser] Received chunk:', chunk.length, 'bytes', 'for conversation:', conversationId);
-		state.buffer += chunk;
-		const lines = state.buffer.split('\n');
-
-		// Keep the last incomplete line in the buffer
-		state.buffer = lines.pop() || '';
-		console.log('[StreamParser] Processing', lines.length, 'complete lines, buffer has', state.buffer.length, 'bytes remaining');
-
-		for (const line of lines) {
-			if (line.trim()) {
-				console.log('[StreamParser] Processing line:', line.substring(0, 100));
-				this.processLine(line, conversationId, state);
-			}
-		}
-	}
-
-	/**
-	 * Process a single line of JSON
-	 */
 	private processLine(line: string, conversationId: string | undefined, state: ConversationParserState): void {
+		console.log('[StreamParser] Processing line:', line.substring(0, 100));
 		try {
-			const jsonData = JSON.parse(line);
-			this.processJsonData(jsonData, conversationId, state);
+			const data = JSON.parse(line);
+			this.routeMessage(data, conversationId, state);
 		} catch (error) {
 			console.error('Failed to parse JSON line:', line, error);
 		}
 	}
 
-	/**
-	 * Process parsed JSON data
-	 * All callbacks receive the conversationId so they know which conversation this data belongs to
-	 */
-	private processJsonData(data: any, convId: string | undefined, state: ConversationParserState): void {
+	private routeMessage(data: any, convId: string | undefined, state: ConversationParserState): void {
 		console.log('[StreamParser] Processing JSON data type:', data.type, 'for conversation:', convId);
 
-		// Handle control messages
-		if (data.type === 'control_request') {
-			console.log('[StreamParser] Control request received for conversation:', convId);
-			this.callbacks.onControlRequest?.(data, convId);
-			return;
-		}
-
-		if (data.type === 'control_response') {
-			console.log('[StreamParser] Control response received (echo from Claude)');
-			this.callbacks.onControlResponse?.(data);
-			return;
-		}
-
-		// Handle account info
-		if (data.type === 'account_info') {
-			this.callbacks.onAccountInfo?.(data);
-			return;
-		}
-
-		// Handle session start
+		// Handle session start (can be on any message with session_id)
 		if (data.session_id && !state.currentStreamingMessageId) {
 			state.currentStreamingMessageId = data.session_id;
 			this.callbacks.onSessionStart?.(data.session_id, convId);
 		}
 
-		// Handle different content types
-		if (data.type === 'tool_use') {
-			// Skip AskUserQuestion - it will be handled via control_request to show proper UI
-			// Otherwise it shows duplicate: raw parameters AND the nice question form
-			if (data.name === 'AskUserQuestion') {
-				return;
-			}
-			// Normalize tool_use data format to match expected UI structure
-			const toolData = {
-				toolName: data.name,
-				toolInfo: data.name,
-				rawInput: data.input,
-				id: data.id
-			};
-			// Track tool ID to name mapping for tool_result
-			if (data.id && data.name) {
-				state.toolIdToName.set(data.id, data.name);
-			}
-			this.callbacks.onToolUse?.(toolData, convId);
-		} else if (data.type === 'tool_result') {
-			// Normalize tool_result data format to match expected UI structure
-			const toolName = state.toolIdToName.get(data.tool_use_id) || 'Unknown';
-			const toolResultData = {
-				toolName: toolName,
-				content: data.content,
-				isError: data.is_error || false,
-				tool_use_id: data.tool_use_id
-			};
-			this.callbacks.onToolResult?.(toolResultData, convId);
-		} else if (data.type === 'stream_event') {
-			// Handle streaming events from --include-partial-messages
-			const event = data.event;
-			if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-				const text = event.delta.text || '';
-				state.currentMessageContent += text;
-				this.callbacks.onTextDelta?.(text, convId);
-			}
-		} else if (data.type === 'text_delta') {
-			// Accumulate text deltas (direct format)
-			const text = data.text || '';
-			state.currentMessageContent += text;
-			this.callbacks.onTextDelta?.(text, convId);
-		} else if (data.type === 'assistant') {
-			// Handle assistant message (contains full message with content array)
-			// Text may come from streaming (text_delta events) or directly in content array
-			// Process tool_use items and collect text content
-			let assistantTextContent = '';
-			if (data.message?.content) {
-				for (const contentItem of data.message.content) {
-					if (contentItem.type === 'tool_use') {
-						// Skip AskUserQuestion - handled via control_request to show proper UI
-						if (contentItem.name === 'AskUserQuestion') {
-							continue;
-						}
-						// Before showing tool use, flush any accumulated text as a complete message
-						// This ensures text before tool use is displayed properly
-						if (state.currentMessageContent) {
-							this.callbacks.onMessage?.(state.currentMessageContent, convId);
-							state.currentMessageContent = '';
-						}
-						// Format tool use for display
-						const toolData = {
-							toolName: contentItem.name,
-							toolInfo: contentItem.name,
-							rawInput: contentItem.input,
-							id: contentItem.id
-						};
-						// Track tool ID to name mapping for tool_result
-						if (contentItem.id && contentItem.name) {
-							state.toolIdToName.set(contentItem.id, contentItem.name);
-						}
-						this.callbacks.onToolUse?.(toolData, convId);
-					} else if (contentItem.type === 'text' && contentItem.text) {
-						// Collect text from content array (used when not streaming)
-						assistantTextContent += contentItem.text;
-					}
-				}
-			}
-
-			// Flush accumulated streaming text OR extracted text from content array
-			// Streaming text takes priority (if present, content array text is duplicate)
-			if (state.currentMessageContent) {
-				this.callbacks.onMessage?.(state.currentMessageContent, convId);
-				state.currentMessageContent = '';
-				state.messageSentThisTurn = true;
-			} else if (assistantTextContent) {
-				// No streaming text was accumulated - use text from content array
-				this.callbacks.onMessage?.(assistantTextContent, convId);
-				state.messageSentThisTurn = true;
-			}
-
-			// Extract usage from assistant message
-			if (data.message?.usage) {
-				const usage = data.message.usage;
-				console.log('[StreamParser] Assistant message usage:', usage);
-				if (usage.input_tokens || usage.output_tokens) {
-					this.callbacks.onTokenUsage?.(
-						usage.input_tokens || 0,
-						usage.output_tokens || 0,
-						convId
-					);
-				}
-			}
-		} else if (data.type === 'message') {
-			// Full message received
-			if (state.currentMessageContent) {
-				this.callbacks.onMessage?.(state.currentMessageContent, convId);
-				state.currentMessageContent = '';
-				state.messageSentThisTurn = true;
-			}
-		} else if (data.type === 'result') {
-			// Final result with stats
-			console.log('[StreamParser] Result data:', JSON.stringify(data));
-
-			// If there's accumulated streaming text, flush it first
-			if (state.currentMessageContent) {
-				this.callbacks.onMessage?.(state.currentMessageContent, convId);
-				state.currentMessageContent = '';
-				state.messageSentThisTurn = true;
-			}
-			// If no message was sent this turn and result contains text,
-			// this means the response wasn't streamed - display it now
-			// (avoid duplicates if assistant message already sent the text)
-			else if (!state.messageSentThisTurn && data.result && typeof data.result === 'string') {
-				console.log('[StreamParser] Result contains non-streamed text, displaying');
-				this.callbacks.onMessage?.(data.result, convId);
-			}
-
-			this.callbacks.onResult?.(data, convId);
-			// Reset the flag for the next turn
-			state.messageSentThisTurn = false;
-
-			// Extract usage info - can be at top level or in usage object
-			// Also check for nested result.usage structure
-			const usage = data.usage || data.result?.usage || {};
-			const inputTokens = data.input_tokens || usage.input_tokens || 0;
-			const outputTokens = data.output_tokens || usage.output_tokens || 0;
-			console.log('[StreamParser] Result token extraction:', {
-				'data.input_tokens': data.input_tokens,
-				'data.output_tokens': data.output_tokens,
-				'data.usage': data.usage,
-				'data.result?.usage': data.result?.usage,
-				'resolved': { inputTokens, outputTokens }
-			});
-			if (inputTokens || outputTokens) {
-				console.log('[StreamParser] Tokens found:', inputTokens, outputTokens);
-				this.callbacks.onTokenUsage?.(inputTokens, outputTokens, convId);
-			} else {
-				console.log('[StreamParser] No tokens in result data. Keys:', Object.keys(data));
-			}
-
-			if (data.total_cost_usd) {
-				console.log('[StreamParser] Cost found:', data.total_cost_usd);
-				this.callbacks.onCostUpdate?.(data.total_cost_usd, convId);
-			} else {
-				console.log('[StreamParser] No cost in result data');
-			}
-
-			// Reset for next message
-			state.currentMessageContent = '';
-			state.currentStreamingMessageId = null;
-		} else if (data.type === 'error') {
-			this.callbacks.onError?.(data.message || 'Unknown error', convId);
+		// Route based on message type
+		switch (data.type) {
+			case 'control_request':
+				this.handleControlRequest(data, convId);
+				break;
+			case 'control_response':
+				this.handleControlResponse(data);
+				break;
+			case 'account_info':
+				this.callbacks.onAccountInfo?.(data);
+				break;
+			case 'tool_use':
+				this.handleToolUse(data, convId, state);
+				break;
+			case 'tool_result':
+				this.handleToolResult(data, convId, state);
+				break;
+			case 'stream_event':
+				this.handleStreamEvent(data, convId, state);
+				break;
+			case 'text_delta':
+				this.handleTextDelta(data, convId, state);
+				break;
+			case 'assistant':
+				this.handleAssistantMessage(data, convId, state);
+				break;
+			case 'message':
+				this.handleMessage(state, convId);
+				break;
+			case 'result':
+				this.handleResult(data, convId, state);
+				break;
+			case 'error':
+				this.callbacks.onError?.(data.message || 'Unknown error', convId);
+				break;
 		}
 	}
 
-	/**
-	 * Reset parser state for a specific conversation
-	 */
-	public resetConversation(conversationId: string): void {
-		this.conversationStates.delete(conversationId);
+	// ============================================================
+	// Message Type Handlers
+	// ============================================================
+
+	private handleControlRequest(data: ControlRequest, convId: string | undefined): void {
+		console.log('[StreamParser] Control request received for conversation:', convId);
+		this.callbacks.onControlRequest?.(data, convId);
 	}
 
-	/**
-	 * Reset all parser state (legacy method for compatibility)
-	 */
-	public reset(): void {
-		this.conversationStates.clear();
-		this.defaultState = this.createEmptyState();
+	private handleControlResponse(data: ControlResponse): void {
+		console.log('[StreamParser] Control response received (echo from Claude)');
+		this.callbacks.onControlResponse?.(data);
 	}
 
-	/**
-	 * Get current message content for a conversation
-	 */
-	public getCurrentMessage(conversationId?: string): string {
-		const state = this.getState(conversationId);
-		return state.currentMessageContent;
+	private handleToolUse(data: { id?: string; name?: string; input?: unknown }, convId: string | undefined, state: ConversationParserState): void {
+		// Always track tool ID to name mapping (needed for tool_result)
+		if (data.id && data.name) {
+			state.toolIdToName.set(data.id, data.name);
+		}
+
+		// Skip UI display for hidden tools (they have separate UI handling)
+		if (data.name && HIDDEN_TOOLS.has(data.name)) {
+			return;
+		}
+
+		this.callbacks.onToolUse?.({
+			toolName: data.name || 'Unknown',
+			toolInfo: data.name || 'Unknown',
+			rawInput: data.input,
+			id: data.id || ''
+		}, convId);
 	}
 
-	/**
-	 * Set the conversation ID context - kept for compatibility but no longer needed
-	 * @deprecated Use parseChunk(chunk, conversationId) instead
-	 */
-	public setConversationContext(_conversationId: string | undefined): void {
-		// No-op - kept for backwards compatibility
-		// Conversation context is now passed directly to parseChunk
+	private handleToolResult(data: { tool_use_id?: string; content?: string; is_error?: boolean }, convId: string | undefined, state: ConversationParserState): void {
+		const toolName = state.toolIdToName.get(data.tool_use_id || '') || 'Unknown';
+		this.callbacks.onToolResult?.({
+			toolName,
+			content: data.content || '',
+			isError: data.is_error || false,
+			tool_use_id: data.tool_use_id || ''
+		}, convId);
 	}
 
-	/**
-	 * Get the current conversation context - kept for compatibility
-	 * @deprecated Conversation context is now managed per-call
-	 */
-	public getConversationContext(): string | undefined {
-		// Return undefined - context is no longer stored globally
-		return undefined;
+	private handleStreamEvent(data: StreamEventData, convId: string | undefined, state: ConversationParserState): void {
+		const event = data.event;
+		if (event?.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
+			const text = event.delta.text || '';
+			state.currentMessageContent += text;
+			this.callbacks.onTextDelta?.(text, convId);
+		}
+	}
+
+	private handleTextDelta(data: { text?: string }, convId: string | undefined, state: ConversationParserState): void {
+		const text = data.text || '';
+		state.currentMessageContent += text;
+		this.callbacks.onTextDelta?.(text, convId);
+	}
+
+	private handleAssistantMessage(data: AssistantMessageData, convId: string | undefined, state: ConversationParserState): void {
+		let assistantTextContent = '';
+
+		// Process content array
+		for (const item of data.message?.content || []) {
+			if (item.type === 'tool_use') {
+				this.processToolUseFromContent(item, convId, state);
+			} else if (item.type === 'text' && item.text) {
+				assistantTextContent += item.text;
+			}
+		}
+
+		// Flush message content (streaming text takes priority over content array)
+		this.flushMessageContent(state, convId, assistantTextContent);
+
+		// Extract usage
+		this.extractUsage(data.message?.usage, convId);
+	}
+
+	private handleMessage(state: ConversationParserState, convId: string | undefined): void {
+		if (state.currentMessageContent) {
+			this.callbacks.onMessage?.(state.currentMessageContent, convId);
+			state.currentMessageContent = '';
+			state.messageSentThisTurn = true;
+		}
+	}
+
+	private handleResult(data: ResultData, convId: string | undefined, state: ConversationParserState): void {
+		console.log('[StreamParser] Result data:', JSON.stringify(data));
+
+		// Flush any accumulated text
+		if (state.currentMessageContent) {
+			this.callbacks.onMessage?.(state.currentMessageContent, convId);
+			state.currentMessageContent = '';
+			state.messageSentThisTurn = true;
+		} else if (!state.messageSentThisTurn && data.result && typeof data.result === 'string') {
+			// Display non-streamed result text
+			console.log('[StreamParser] Result contains non-streamed text, displaying');
+			this.callbacks.onMessage?.(data.result, convId);
+		}
+
+		this.callbacks.onResult?.(data, convId);
+		state.messageSentThisTurn = false;
+
+		// Extract and report usage
+		this.extractResultUsage(data, convId);
+
+		// Extract cost
+		if (data.total_cost_usd) {
+			console.log('[StreamParser] Cost found:', data.total_cost_usd);
+			this.callbacks.onCostUpdate?.(data.total_cost_usd, convId);
+		}
+
+		// Reset state for next message
+		state.currentMessageContent = '';
+		state.currentStreamingMessageId = null;
+	}
+
+	// ============================================================
+	// Helper Methods
+	// ============================================================
+
+	private processToolUseFromContent(
+		item: { name?: string; id?: string; input?: unknown },
+		convId: string | undefined,
+		state: ConversationParserState
+	): void {
+		// Always track tool ID mapping
+		if (item.id && item.name) {
+			state.toolIdToName.set(item.id, item.name);
+		}
+
+		// Skip UI for hidden tools
+		if (item.name && HIDDEN_TOOLS.has(item.name)) {
+			return;
+		}
+
+		// Flush accumulated text before showing tool use
+		if (state.currentMessageContent) {
+			this.callbacks.onMessage?.(state.currentMessageContent, convId);
+			state.currentMessageContent = '';
+		}
+
+		this.callbacks.onToolUse?.({
+			toolName: item.name || 'Unknown',
+			toolInfo: item.name || 'Unknown',
+			rawInput: item.input,
+			id: item.id || ''
+		}, convId);
+	}
+
+	private flushMessageContent(state: ConversationParserState, convId: string | undefined, fallbackContent: string): void {
+		if (state.currentMessageContent) {
+			this.callbacks.onMessage?.(state.currentMessageContent, convId);
+			state.currentMessageContent = '';
+			state.messageSentThisTurn = true;
+		} else if (fallbackContent) {
+			this.callbacks.onMessage?.(fallbackContent, convId);
+			state.messageSentThisTurn = true;
+		}
+	}
+
+	private extractUsage(usage: UsageData | undefined, convId: string | undefined): void {
+		if (!usage) {
+			return;
+		}
+
+		console.log('[StreamParser] Assistant message usage:', usage);
+		if (usage.input_tokens || usage.output_tokens) {
+			this.callbacks.onTokenUsage?.(usage.input_tokens || 0, usage.output_tokens || 0, convId);
+		}
+	}
+
+	private extractResultUsage(data: ResultData, convId: string | undefined): void {
+		const usage = data.usage || (data.result as { usage?: UsageData } | undefined)?.usage || {};
+		const inputTokens = data.input_tokens || usage.input_tokens || 0;
+		const outputTokens = data.output_tokens || usage.output_tokens || 0;
+
+		console.log('[StreamParser] Result token extraction:', {
+			'data.input_tokens': data.input_tokens,
+			'data.output_tokens': data.output_tokens,
+			'data.usage': data.usage,
+			resolved: { inputTokens, outputTokens }
+		});
+
+		if (inputTokens || outputTokens) {
+			console.log('[StreamParser] Tokens found:', inputTokens, outputTokens);
+			this.callbacks.onTokenUsage?.(inputTokens, outputTokens, convId);
+		} else {
+			console.log('[StreamParser] No tokens in result data. Keys:', Object.keys(data));
+		}
 	}
 }
