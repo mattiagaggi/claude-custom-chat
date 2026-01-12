@@ -142,6 +142,11 @@ export class StreamParser {
 
 		// Handle different content types
 		if (data.type === 'tool_use') {
+			// Skip AskUserQuestion - it will be handled via control_request to show proper UI
+			// Otherwise it shows duplicate: raw parameters AND the nice question form
+			if (data.name === 'AskUserQuestion') {
+				return;
+			}
 			// Normalize tool_use data format to match expected UI structure
 			const toolData = {
 				toolName: data.name,
@@ -185,6 +190,10 @@ export class StreamParser {
 			if (data.message?.content) {
 				for (const contentItem of data.message.content) {
 					if (contentItem.type === 'tool_use') {
+						// Skip AskUserQuestion - handled via control_request to show proper UI
+						if (contentItem.name === 'AskUserQuestion') {
+							continue;
+						}
 						// Before showing tool use, flush any accumulated text as a complete message
 						// This ensures text before tool use is displayed properly
 						if (state.currentMessageContent) {
