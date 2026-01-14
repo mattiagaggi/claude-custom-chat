@@ -1,0 +1,90 @@
+    body {
+        font-family: var(--vscode-font-family);
+        background-color: var(--vscode-editor-background);
+        color: var(--vscode-editor-foreground);
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header {
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--vscode-panel-border);
+        background-color: var(--vscode-panel-background);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .header h2 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 500;
+        color: var(--vscode-foreground);
+        letter-spacing: -0.3px;
+    }
+
+    @media (max-width: 385px) {
+        .header h2 {
+            display: none;
+        }
+    }
+
+    .controls {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .btn {
+        background-color: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: 1px solid var(--vscode-panel-border);
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+        font-weight: 400;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .btn:hover {
+        background-color: var(--vscode-button-background);
+        border-color: var(--vscode-focusBorder);
+    }
+
+    .btn.outlined {
+        background-color: transparent;
+        color: var(--vscode-foreground);
+        border-color: var(--vscode-panel-border);
+    }
+
+    .btn.outlined:hover {
+        background-color: var(--vscode-list-hoverBackground);
+        border-color: var(--vscode-focusBorder);
+    }
+
+    .btn.stop {
+        background-color: transparent;
+        color: var(--vscode-descriptionForeground);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 12px;
+        font-weight: 400;
+        opacity: 0.7;
+    }
+
+    .btn.stop:hover {
+        background-color: rgba(231, 76, 60, 0.1);
+        color: #e74c3c;
+        border-color: rgba(231, 76, 60, 0.3);
+        opacity: 1;
+    }
+
+    /* Permission Request */

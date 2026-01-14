@@ -1,0 +1,645 @@
+        font-size: 12px;
+        color: var(--vscode-descriptionForeground);
+    }
+
+    .install-success {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        padding: 20px 0;
+    }
+
+    .install-success-icon {
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: rgba(78, 201, 176, 0.15);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .install-check {
+        width: 28px;
+        height: 28px;
+        color: var(--vscode-testing-iconPassed, #4ec9b0);
+    }
+
+    .install-success-text {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+    }
+
+    .install-success-hint {
+        margin: 0;
+        font-size: 13px;
+        color: var(--vscode-descriptionForeground);
+    }
+
+        /* User Question Styles */
+        .user-question {
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 6px;
+            padding: 16px;
+            margin: 12px 0;
+            background: var(--vscode-editor-background);
+        }
+
+        .question-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .question-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+
+        .question-block {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .question-header {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--vscode-descriptionForeground);
+            letter-spacing: 0.5px;
+        }
+
+        .question-text {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .question-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .question-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 12px;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .question-option:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+
+        .question-option input[type="radio"],
+        .question-option input[type="checkbox"] {
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+
+        .option-content {
+            flex: 1;
+        }
+
+        .option-label {
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .option-description {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .question-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            padding-top: 8px;
+        }
+
+        /* Active Conversation Tabs */
+        .active-conversation-tabs {
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background-color: var(--vscode-panel-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding: 8px 12px 0 12px;
+            overflow-x: auto;
+            overflow-y: hidden;
+        }
+
+        .conversation-tabs-list {
+            display: flex;
+            gap: 4px;
+            min-height: 32px;
+            flex: 1;
+        }
+
+        .clear-all-tabs-btn {
+            background: transparent;
+            border: 1px solid var(--vscode-panel-border);
+            color: var(--vscode-descriptionForeground);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            white-space: nowrap;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .clear-all-tabs-btn:hover {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: #e74c3c;
+            border-color: rgba(231, 76, 60, 0.3);
+        }
+
+        .conversation-tab {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-bottom: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            transition: all 0.2s ease;
+            white-space: nowrap;
+            max-width: 200px;
+            position: relative;
+        }
+
+        .conversation-tab:hover {
+            background-color: var(--vscode-list-hoverBackground);
+            color: var(--vscode-foreground);
+        }
+
+        .conversation-tab.active {
+            background-color: var(--vscode-editor-background);
+            color: var(--vscode-foreground);
+            border-color: var(--vscode-focusBorder);
+            font-weight: 500;
+        }
+
+        .conversation-tab-title {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .conversation-tab-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 16px;
+            height: 16px;
+            padding: 0 4px;
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+
+        .conversation-tab-close {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            opacity: 0.5;
+            font-size: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .conversation-tab:hover .conversation-tab-close {
+            opacity: 0.8;
+        }
+
+        .conversation-tab-close:hover {
+            background-color: rgba(231, 76, 60, 0.2);
+            color: #e74c3c;
+            opacity: 1;
+        }
+
+        .conversation-tab-processing {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--vscode-progressBar-background);
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .conversation-tab-stop {
+            cursor: pointer;
+            opacity: 0.6;
+            padding: 2px 4px;
+            font-size: 10px;
+            color: var(--vscode-errorForeground, #f44336);
+            border-radius: 2px;
+            transition: opacity 0.2s, background-color 0.2s;
+            margin-left: 4px;
+        }
+
+        .conversation-tab-stop:hover {
+            opacity: 1;
+            background-color: rgba(244, 67, 54, 0.2);
+        }
+
+        /* Conversation item with actions */
+        .conversation-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .conversation-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .conversation-actions {
+            display: flex;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .conversation-item:hover .conversation-actions {
+            opacity: 1;
+        }
+
+        .btn.small {
+            padding: 4px 8px;
+            font-size: 14px;
+            min-width: auto;
+        }
+
+        .open-in-panel-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Processing indicator dot for conversation history */
+        .conversation-processing-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #4caf50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse-dot 1.5s ease-in-out infinite;
+            vertical-align: middle;
+        }
+
+        @keyframes pulse-dot {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.6;
+                transform: scale(0.9);
+            }
+        }
+
+        /* Code Suggestion Styles */
+        .code-suggestion {
+            background: linear-gradient(135deg,
+                    rgba(137, 209, 133, 0.08) 0%,
+                    rgba(204, 167, 0, 0.08) 100%);
+            border: 1px solid rgba(137, 209, 133, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            margin: 12px 0;
+            animation: suggestion-fade-in 0.3s ease-out;
+        }
+
+        @keyframes suggestion-fade-in {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .suggestion-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .suggestion-icon {
+            font-size: 16px;
+        }
+
+        .suggestion-label {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--vscode-descriptionForeground);
+        }
+
+        .suggestion-priority {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: white;
+        }
+
+        .suggestion-category {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+        }
+
+        .suggestion-dismiss {
+            margin-left: auto;
+            background: transparent;
+            border: none;
+            color: var(--vscode-descriptionForeground);
+            cursor: pointer;
+            padding: 2px 6px;
+            font-size: 14px;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+        }
+
+        .suggestion-dismiss:hover {
+            opacity: 1;
+        }
+
+        .suggestion-title {
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--vscode-foreground);
+            margin-bottom: 4px;
+        }
+
+        .suggestion-description {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground);
+            line-height: 1.4;
+        }
+
+        .suggestion-remaining {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            margin-top: 8px;
+            opacity: 0.7;
+            font-style: italic;
+        }
+
+        /* Idea button styles */
+        .idea-btn {
+            background: transparent;
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 14px;
+            cursor: not-allowed;
+            opacity: 0.4;
+            transition: all 0.3s ease;
+        }
+
+        .idea-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        .idea-btn.ready {
+            cursor: pointer;
+            opacity: 1;
+            animation: ideaPulse 2s ease-in-out infinite;
+        }
+
+        .idea-btn.ready:hover {
+            background: rgba(255, 215, 0, 0.15);
+            border-color: rgba(255, 215, 0, 0.5);
+            transform: scale(1.05);
+        }
+
+        @keyframes ideaPulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 8px 2px rgba(255, 215, 0, 0.2);
+            }
+        }
+
+        /* Slash command autocomplete dropdown */
+        .slash-autocomplete {
+            position: absolute;
+            bottom: 100%;
+            left: 10px;
+            right: 10px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .slash-autocomplete-list {
+            padding: 4px;
+        }
+
+        .slash-autocomplete-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.15s ease;
+        }
+
+        .slash-autocomplete-item:hover,
+        .slash-autocomplete-item.selected {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .slash-autocomplete-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+        }
+
+        .slash-autocomplete-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .slash-autocomplete-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .slash-autocomplete-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--vscode-foreground);
+        }
+
+        .slash-autocomplete-desc {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .slash-autocomplete-hint {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.7;
+            padding: 6px 12px;
+            border-top: 1px solid var(--vscode-panel-border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .slash-autocomplete-hint kbd {
+            background: var(--vscode-button-secondaryBackground);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: inherit;
+        }
+
+        /* File mention autocomplete dropdown */
+        .file-autocomplete {
+            position: absolute;
+            bottom: 100%;
+            left: 10px;
+            right: 10px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 8px;
+            box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.25);
+            max-height: 350px;
+            overflow-y: auto;
+            z-index: 1000;
+            margin-bottom: 8px;
+        }
+
+        .file-autocomplete-list {
+            padding: 4px;
+        }
+
+        .file-autocomplete-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: background-color 0.15s ease;
+        }
+
+        .file-autocomplete-item:hover,
+        .file-autocomplete-item.selected {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        .file-autocomplete-item.selected {
+            background-color: var(--vscode-list-activeSelectionBackground);
+        }
+
+        .file-autocomplete-icon {
+            font-size: 14px;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .file-autocomplete-content {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .file-autocomplete-name {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--vscode-foreground);
+        }
+
+        .file-autocomplete-path {
+            font-size: 11px;
+            color: var(--vscode-descriptionForeground);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-autocomplete-hint {
+            font-size: 10px;
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.7;
+            padding: 6px 12px;
+            border-top: 1px solid var(--vscode-panel-border);
+            display: flex;
+            gap: 12px;
+        }
+
+        .file-autocomplete-hint kbd {
+            background: var(--vscode-button-secondaryBackground);
+            padding: 1px 4px;
+            border-radius: 3px;
+            font-family: inherit;
+        }
+
+        .file-autocomplete-loading,
+        .file-autocomplete-empty {
+            padding: 16px;
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+            font-size: 12px;

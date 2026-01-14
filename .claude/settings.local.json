@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run compile:*)",
+      "Bash(grep:*)",
+      "Bash(sed:*)",
+      "Bash(rg:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm test:*)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nSplit styles.css into modular CSS files\n\nOrganize ~4000 lines of CSS into 14 logical modules:\n- 01-base.css: Body, header, container styles\n- 02-permissions.css: Permission request dialog\n- 03-permissions-management.css: Permissions list management\n- 04-wsl-chat.css: WSL alert and chat container\n- 05-messages.css: Chat message styling\n- 06-code-blocks.css: Code block and syntax highlighting\n- 07-tools-diffs.css: Tool displays and diff views\n- 08-history-modal.css: Conversation history modal\n- 09-mcp-modal.css: MCP configuration modal\n- 10-slash-commands.css: Slash commands UI\n- 11-context-markdown.css: Context usage and markdown\n- 12-animations-loading.css: Animations and loading states\n- 13-mcp-servers.css: MCP servers management\n- 14-responsive.css: Media queries and responsive styles\n\nBuild script updated to concatenate CSS files during compile.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+    ],
+    "deny": []
+  },
+  "enableAllProjectMcpServers": false
+}

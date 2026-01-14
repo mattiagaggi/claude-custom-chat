@@ -1,0 +1,46 @@
+/**
+ * state.js - Centralized State Management
+ *
+ * Defines all global state variables used across webview modules.
+ * Includes: VS Code API, DOM element references, processing state,
+ * message queue, token/cost tracking, and UI state flags.
+ */
+
+const vscode = acquireVsCodeApi();
+const messagesDiv = document.getElementById('messages');
+const messageInput = document.getElementById('messageInput');
+const sendBtn = document.getElementById('sendBtn');
+const statusDiv = document.getElementById('status');
+const statusTextDiv = document.getElementById('statusText');
+const filePickerModal = document.getElementById('filePickerModal');
+const fileSearchInput = document.getElementById('fileSearchInput');
+const fileList = document.getElementById('fileList');
+const imageBtn = document.getElementById('imageBtn');
+
+let isProcessing = false;
+let isExecutingTool = false;
+let readyMessageShown = false;
+
+// Conversation state - stored on window for cross-script access
+window.currentViewedConversationId = null;
+window.currentStreamingMessageId = null;
+window.streamingState = null;
+let filteredFiles = [];
+let selectedFileIndex = -1;
+let planModeEnabled = false;
+let thinkingModeEnabled = false;
+let lastPendingEditIndex = -1;
+let lastPendingEditData = null;
+let editingServerName = null;
+let customSnippetsData = {};
+let totalTokensInput = 0;
+let totalTokensOutput = 0;
+let totalCost = 0;
+let contextWindow = 200000; // Default 200k context window
+let currentContextUsed = 0; // Actual context used this turn (input + cache)
+let requestCount = 0;
+let subscriptionType = null;
+let requestStartTime = null;
+let requestTimer = null;
+let currentModel = 'Opus';
+let messageQueue = [];

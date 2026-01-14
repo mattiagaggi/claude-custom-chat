@@ -1,0 +1,307 @@
+    /* Popular MCP Servers */
+    .mcp-popular-servers {
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid var(--vscode-panel-border);
+    }
+
+    .mcp-popular-servers h4 {
+        margin: 0 0 16px 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+        opacity: 0.9;
+    }
+
+    .popular-servers-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 12px;
+    }
+
+    .popular-server-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 16px;
+        background-color: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .popular-server-item:hover {
+        border-color: var(--vscode-focusBorder);
+        background-color: var(--vscode-list-hoverBackground);
+        transform: translateY(-1px);
+    }
+
+    .popular-server-icon {
+        font-size: 24px;
+        flex-shrink: 0;
+    }
+
+    .popular-server-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .popular-server-name {
+        font-weight: 600;
+        font-size: 13px;
+        color: var(--vscode-foreground);
+        margin-bottom: 2px;
+    }
+
+    .popular-server-desc {
+        font-size: 11px;
+        color: var(--vscode-descriptionForeground);
+        opacity: 0.8;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* Processing indicator - morphing orange dot */
+    .processing-indicator {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        padding: 12px 0;
+        margin-top: 8px;
+    }
+
+    .processing-indicator .morph-dot {
+        width: 8px;
+        height: 8px;
+        background: linear-gradient(135deg, #ff9500 0%, #ff6b00 100%);
+        box-shadow: 0 0 8px rgba(255, 149, 0, 0.5);
+        animation: morphShape 3s ease-in-out infinite;
+    }
+
+    @keyframes morphShape {
+
+        0%,
+        100% {
+            border-radius: 50%;
+            transform: scale(1) rotate(0deg);
+        }
+
+        15% {
+            border-radius: 50%;
+            transform: scale(1.3) rotate(0deg);
+        }
+
+        25% {
+            border-radius: 20%;
+            transform: scale(1) rotate(45deg);
+        }
+
+        40% {
+            border-radius: 20%;
+            transform: scale(1.2) rotate(90deg);
+        }
+
+        50% {
+            border-radius: 50% 50% 50% 0%;
+            transform: scale(1) rotate(135deg);
+        }
+
+        65% {
+            border-radius: 0%;
+            transform: scale(1.3) rotate(180deg);
+        }
+
+        75% {
+            border-radius: 50% 0% 50% 0%;
+            transform: scale(1) rotate(270deg);
+        }
+
+        85% {
+            border-radius: 30%;
+            transform: scale(1.2) rotate(315deg);
+        }
+    }
+
+    /* Install Modal Styles */
+    .install-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .install-modal-backdrop {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        backdrop-filter: blur(2px);
+    }
+
+    .install-modal-content {
+        position: relative;
+        background: var(--vscode-editor-background);
+        border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+        border-radius: 12px;
+        width: 320px;
+        padding: 32px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        animation: installFadeIn 0.2s ease-out;
+    }
+
+    @keyframes installFadeIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95) translateY(-8px);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1) translateY(0);
+        }
+    }
+
+    .install-close-btn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        width: 28px;
+        height: 28px;
+        background: none;
+        border: none;
+        color: var(--vscode-descriptionForeground);
+        cursor: pointer;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.6;
+        transition: all 0.15s;
+    }
+
+    .install-close-btn:hover {
+        background: var(--vscode-toolbar-hoverBackground);
+        opacity: 1;
+    }
+
+    .install-body {
+        text-align: center;
+    }
+
+    .install-main {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .install-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        background: var(--vscode-button-background);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .install-icon {
+        color: var(--vscode-button-foreground);
+    }
+
+    .install-text {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .install-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: var(--vscode-foreground);
+    }
+
+    .install-desc {
+        margin: 0;
+        font-size: 13px;
+        color: var(--vscode-descriptionForeground);
+        line-height: 1.4;
+    }
+
+    .install-btn {
+        width: 100%;
+        padding: 12px 24px;
+        font-size: 14px;
+        font-weight: 500;
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .install-btn:hover {
+        background: var(--vscode-button-hoverBackground);
+        transform: translateY(-1px);
+    }
+
+    .install-btn:active {
+        transform: translateY(0);
+    }
+
+    .install-link {
+        font-size: 13px;
+        color: var(--vscode-textLink-foreground);
+        text-decoration: none;
+        opacity: 0.9;
+    }
+
+    .install-link:hover {
+        text-decoration: underline;
+        opacity: 1;
+    }
+
+    .install-progress {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+        padding: 20px 0;
+    }
+
+    .install-spinner {
+        width: 32px;
+        height: 32px;
+        border: 2.5px solid var(--vscode-widget-border, var(--vscode-panel-border));
+        border-top-color: var(--vscode-button-background);
+        border-radius: 50%;
+        animation: installSpin 0.8s linear infinite;
+    }
+
+    @keyframes installSpin {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    .install-progress-text {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--vscode-foreground);
+    }
+
+    .install-progress-hint {
+        margin: 0;

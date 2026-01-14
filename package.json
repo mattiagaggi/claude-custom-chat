@@ -1,0 +1,246 @@
+{
+  "name": "claude-custom-chat",
+  "displayName": "Claude Custom Chat",
+  "description": "Beautiful Custom Chat Interface for Claude Code",
+  "version": "1.0.0",
+  "publisher": "MattiaGaggi",
+  "author": "Mattia Gaggi",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mattiagaggi/claude-custom-chat"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {
+    "vscode": "^1.94.0"
+  },
+  "categories": [
+    "Other",
+    "AI",
+    "Chat",
+    "Machine Learning",
+    "Snippets",
+    "Programming Languages",
+    "Education",
+    "Testing",
+    "Formatters",
+    "Linters"
+  ],
+  "keywords": [
+    "claude code",
+    "code explanation",
+    "code generation",
+    "code summary",
+    "code transform",
+    "vibe coding",
+    "prompt language",
+    "copilot",
+    "claude",
+    "ai",
+    "assistant",
+    "chatbot",
+    "chat",
+    "anthropic",
+    "code",
+    "programming",
+    "development",
+    "productivity"
+  ],
+  "icon": "icon.png",
+  "main": "./out/src/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "claude-custom-chat.openChat",
+        "title": "Open Claude Custom Chat",
+        "category": "Claude Custom Chat",
+        "icon": "icon-bubble.png"
+      },
+      {
+        "command": "claude-custom-chat.openChat1",
+        "title": "Open Claude Chat 1 (Left)",
+        "category": "Claude Custom Chat"
+      },
+      {
+        "command": "claude-custom-chat.openChat2",
+        "title": "Open Claude Chat 2 (Center)",
+        "category": "Claude Custom Chat"
+      },
+      {
+        "command": "claude-custom-chat.openChat3",
+        "title": "Open Claude Chat 3 (Right)",
+        "category": "Claude Custom Chat"
+      },
+      {
+        "command": "claude-custom-chat.devModeRollback",
+        "title": "Dev Mode: Rollback to Latest Snapshot",
+        "category": "Claude Custom Chat"
+      },
+      {
+        "command": "claude-custom-chat.devModePickSnapshot",
+        "title": "Dev Mode: Pick and Rollback to Snapshot",
+        "category": "Claude Custom Chat"
+      },
+      {
+        "command": "claude-custom-chat.devModeClearSnapshots",
+        "title": "Dev Mode: Clear All Snapshots",
+        "category": "Claude Custom Chat"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "claude-custom-chat.openChat",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "claude-custom-chat.openChat"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "claude@1",
+          "when": "editorTextFocus"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "navigation@1",
+          "when": "true"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "claude@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "claude@1"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "navigation@1",
+          "when": "true"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "navigation@1",
+          "when": "view == workbench.explorer.fileView"
+        }
+      ],
+      "touchBar": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "editing",
+          "when": "true"
+        }
+      ],
+      "menuBar/file": [
+        {
+          "command": "claude-custom-chat.openChat",
+          "group": "1_new@1"
+        }
+      ]
+    },
+    "views": {
+      "claude-custom-chat": [
+        {
+          "id": "claude-custom-chat.chat",
+          "type": "webview",
+          "name": "Claude Custom Chat",
+          "when": "true",
+          "icon": "icon-bubble.png",
+          "contextualTitle": "Claude Custom Chat"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claude-custom-chat",
+          "title": "Claude Custom Chat",
+          "icon": "icon-bubble.png"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Custom Chat",
+      "properties": {
+        "claudeCodeChat.wsl.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable WSL integration for running Claude"
+        },
+        "claudeCodeChat.wsl.distro": {
+          "type": "string",
+          "default": "Ubuntu",
+          "description": "WSL distribution name (e.g., Ubuntu, Debian)"
+        },
+        "claudeCodeChat.wsl.nodePath": {
+          "type": "string",
+          "default": "/usr/bin/node",
+          "description": "Path to Node.js in the WSL distribution"
+        },
+        "claudeCodeChat.wsl.claudePath": {
+          "type": "string",
+          "default": "/usr/local/bin/claude",
+          "description": "Path to Claude executable in the WSL distribution"
+        },
+        "claudeCodeChat.thinking.intensity": {
+          "type": "string",
+          "enum": [
+            "think",
+            "think-hard",
+            "think-harder",
+            "ultrathink"
+          ],
+          "default": "think",
+          "description": "Thinking mode intensity level. Higher levels provide more detailed reasoning but consume more tokens."
+        },
+        "claudeCodeChat.permissions.yoloMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable Yolo Mode to skip all permission checks. Use with caution as Claude can execute any command without asking."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "npm run copy-assets && npm run minify && tsc -p ./",
+    "copy-assets": "mkdir -p out/webview && cat src/webview/styles/base.css src/webview/styles/permissions.css src/webview/styles/permissions-management.css src/webview/styles/wsl-chat.css src/webview/styles/messages.css src/webview/styles/code-blocks.css src/webview/styles/tools-diffs.css src/webview/styles/history-modal.css src/webview/styles/mcp-modal.css src/webview/styles/slash-commands.css src/webview/styles/context-markdown.css src/webview/styles/animations-loading.css src/webview/styles/mcp-servers.css src/webview/styles/responsive.css > out/webview/styles.css && cp src/webview/*.js out/webview/",
+    "minify": "for f in out/webview/*.js; do terser \"$f\" -o \"$f\" -c -m; done && csso out/webview/styles.css -o out/webview/styles.css",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "20.x",
+    "@types/vscode": "^1.94.0",
+    "@typescript-eslint/eslint-plugin": "^8.31.1",
+    "@typescript-eslint/parser": "^8.31.1",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.5.0",
+    "csso-cli": "^4.0.2",
+    "eslint": "^9.25.1",
+    "terser": "^5.44.1",
+    "typescript": "^5.8.3"
+  }
+}
