@@ -2,11 +2,22 @@
 
 This is a VSCode extension that provides a chat interface for Claude Code CLI.
 
+## Platform Support
+
+**Tested on:**
+- macOS (ARM64 and Intel)
+- Linux (Ubuntu, Debian, Fedora)
+- Windows 10/11 (via PowerShell)
+
+**Installation:**
+- macOS/Linux: Run `./install-dev.sh`
+- Windows: Run `.\install-dev.ps1` (as Administrator)
+
 ## Dev Mode Workflow
 
 When working on this extension:
 
-1. **Install**: Run `./install-dev.sh` to create a symlink from the IDE's extensions folder to this repo
+1. **Install**: Run the installation script for your platform (see above)
 2. **Modify**: Edit source code in `src/` directory
 3. **Compile**: Run `npm run compile` to build
 4. **Test**: Run `npm test` to verify changes

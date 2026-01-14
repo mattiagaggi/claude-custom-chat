@@ -6,6 +6,24 @@ A VS Code/Cursor extension that provides a custom chat interface for the [Claude
 
 This is a fork of the original [claude-code-chat](https://github.com/anthropics/claude-code-chat) repository.
 
+## Platform Support
+
+**Tested on:**
+- macOS (ARM64 and Intel)
+- Linux (Ubuntu, Debian, Fedora)
+- Windows 10/11 (via PowerShell)
+
+**Supported Editors:**
+- VS Code
+- Cursor
+- Other VS Code forks (Antigravity, etc.)
+
+**Requirements:**
+- Node.js 16+ and npm
+- Git
+- Claude Code CLI (`npm install -g @anthropic/claude`)
+- Active Claude API key or Pro/Max subscription
+
 ## Installation
 
 ### 1. Install Claude Code CLI
@@ -25,8 +43,15 @@ cd claude-custom-chat
 
 ### 3. Run the Installation Script
 
+**On macOS/Linux:**
 ```bash
 ./install-dev.sh
+```
+
+**On Windows:**
+```powershell
+# Run PowerShell as Administrator (required for symlinks)
+.\install-dev.ps1
 ```
 
 The installation script will:
@@ -35,6 +60,8 @@ The installation script will:
 - Compile TypeScript to JavaScript
 - Create a symlink in your editor's extensions directory
 - Set up the development environment
+
+**Note for Windows users:** The script requires administrator privileges to create symbolic links. If you see an error, right-click PowerShell and select "Run as Administrator".
 
 **That's it!** Reload your editor (`Cmd/Ctrl + R`) and press `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac) to open Claude Custom Chat.
 
