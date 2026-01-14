@@ -4,7 +4,7 @@ A VS Code/Cursor extension that provides a custom chat interface for the [Claude
 
 **Self-modifying extension**: Enable Dev Mode and ask Claude to modify the extension itself — add features, fix bugs, or customize the UI — all from within the chat interface. Built-in snapshots let you safely experiment and rollback changes.
 
-This is a fork of the original [claude-custom-chat](https://github.com/anthropics/claude-custom-chat) repository.
+This is a fork of the original [claude-code-chat](https://github.com/anthropics/claude-code-chat) repository.
 
 ## Installation
 
