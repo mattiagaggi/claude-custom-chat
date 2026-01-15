@@ -109,11 +109,26 @@ When dev mode is active, an MCP server is configured that provides Claude with s
 - `Write` - Write/create files in the extension
 - `Edit` - Edit files by replacing exact string matches
 
+**IMPORTANT: Starting Point for Code Exploration**
+
+When dev mode is activated, **ANY exploration or modification of the extension source code MUST begin with the `get_extension_source` MCP tool**. This is the primary entry point that provides:
+- Complete file structure of the extension
+- Contents of key files (extension.ts, ui.ts, package.json)
+- Overview of the extension architecture
+- List of all available files to explore
+
+**Workflow:**
+1. When dev mode activates, always call `get_extension_source` first
+2. Review the file structure and key files provided
+3. Use `Read` tool to examine specific files in detail
+4. Use `Write` or `Edit` tools to make changes
+5. Changes auto-compile and you're prompted to reload
+
 **How to use:**
 - Just ask about the extension naturally (e.g., "where is the rollback code?")
-- Claude will automatically use these tools when needed
+- Claude will automatically call `get_extension_source` first to understand the codebase
+- Then use other tools as needed based on the task
 - All operations are scoped to the extension directory only
-- Claude decides which tool to use based on the task
 
 **Security:** All file paths are validated to ensure they're within the extension directory. Claude cannot access files outside the extension.
 

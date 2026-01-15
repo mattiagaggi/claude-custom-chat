@@ -18,11 +18,23 @@ This is a VSCode extension that provides a chat interface for Claude Code CLI.
 When working on this extension:
 
 1. **Install**: Run the installation script for your platform (see above)
-2. **Modify**: Edit source code in `src/` directory
-3. **Compile**: Run `npm run compile` to build
-4. **Test**: Run `npm test` to verify changes
-5. **Reload**: Reload the IDE window to apply changes
-6. **Push**: Commit and push to branch when ready
+2. **Enable Dev Mode**: Activate dev mode in the extension (this exposes source code via MCP)
+3. **Explore**: Start by calling the `get_extension_source` MCP tool to understand the codebase structure
+4. **Modify**: Edit source code using the MCP tools (`Read`, `Write`, `Edit`)
+5. **Compile**: Changes trigger auto-compilation (or run `npm run compile` manually)
+6. **Test**: Run `npm test` to verify changes
+7. **Reload**: Reload the IDE window to apply changes
+8. **Rollback**: Use rollback commands if needed to undo changes
+9. **Push**: Commit and push to branch when ready
+
+### Important: Starting Point for Code Exploration
+
+**When dev mode is activated, ANY exploration of the codebase MUST start with the MCP `get_extension_source` tool.** This is the primary entry point that provides:
+- Complete file structure overview
+- Content of key files (extension.ts, ui.ts, package.json)
+- Understanding of the extension architecture
+
+Only after calling `get_extension_source` should you use the `Read` tool to examine specific files in detail.
 
 ## Key Directories
 

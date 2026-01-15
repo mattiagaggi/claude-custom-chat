@@ -17,7 +17,7 @@ class MCPServer {
         this.tools = [
             {
                 name: 'get_extension_source',
-                description: 'Get an overview of the Claude Custom Chat extension source code structure. Returns a list of all source files and the content of key files (extension.ts, ui.ts, package.json). Use the Read tool to read other specific files.',
+                description: 'IMPORTANT: This is the STARTING POINT for all extension source code exploration when dev mode is active. ALWAYS call this tool FIRST before reading or modifying any files. Returns: (1) Complete file structure overview, (2) Contents of key files (extension.ts, ui.ts, package.json), (3) List of all available source files. After calling this, use the Read tool to examine specific files in detail.',
                 inputSchema: {
                     type: 'object',
                     properties: {
@@ -139,6 +139,7 @@ class MCPServer {
 
         // Include important files in full
         const keyFiles = [
+            'CLAUDE.md',      // Development instructions for Claude
             'src/extension.ts',
             'src/ui.ts',
             'package.json'
