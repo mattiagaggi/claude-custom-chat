@@ -214,11 +214,16 @@ function generateUnifiedDiffHTML(oldString, newString, filePath, startLine = 1, 
 	if (summary) {
 		html += '<div class="diff-summary-row">';
 		html += '<span class="diff-summary">Summary: ' + summary + '</span>';
+		html += '<div class="diff-buttons">';
 		if (showButton) {
 			html += '<button class="diff-open-btn" onclick="openDiffEditor()" title="Open side-by-side diff in VS Code">';
 			html += '<svg width="14" height="14" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="14" rx="1" fill="none" stroke="currentColor" stroke-opacity="0.5"/><rect x="9" y="1" width="6" height="14" rx="1" fill="none" stroke="currentColor" stroke-opacity="0.5"/><line x1="2.5" y1="4" x2="5.5" y2="4" stroke="#e8a0a0" stroke-width="1.5"/><line x1="2.5" y1="7" x2="5.5" y2="7" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="2.5" y1="10" x2="5.5" y2="10" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="10.5" y1="4" x2="13.5" y2="4" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="10.5" y1="7" x2="13.5" y2="7" stroke="#8fd48f" stroke-width="1.5"/><line x1="10.5" y1="10" x2="13.5" y2="10" stroke="#8fd48f" stroke-width="1.5"/></svg>';
 			html += 'Open Diff</button>';
 		}
+		html += '<button class="diff-open-btn" onclick="runFileInTerminal(\'' + escapeHtml(filePath) + '\')" title="Run file in terminal">';
+		html += '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1 2v12h14V2H1zm13 11H2V3h12v10z" fill="currentColor"/><path d="M3 5l3 2-3 2V5zm4 4h5v1H7V9z" fill="currentColor"/></svg>';
+		html += 'Run in Terminal</button>';
+		html += '</div>';
 		html += '</div>';
 	}
 
@@ -313,11 +318,16 @@ function formatMultiEditToolDiff(input, fileContentBefore, showButton = false, p
 	// Add summary row with Open Diff button
 	html += '<div class="diff-summary-row">';
 	html += '<span class="diff-summary">Summary: ' + input.edits.length + ' edit' + (input.edits.length > 1 ? 's' : '') + '</span>';
+	html += '<div class="diff-buttons">';
 	if (showButton) {
 		html += '<button class="diff-open-btn" onclick="openDiffEditor()" title="Open side-by-side diff in VS Code">';
 		html += '<svg width="14" height="14" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="14" rx="1" fill="none" stroke="currentColor" stroke-opacity="0.5"/><rect x="9" y="1" width="6" height="14" rx="1" fill="none" stroke="currentColor" stroke-opacity="0.5"/><line x1="2.5" y1="4" x2="5.5" y2="4" stroke="#e8a0a0" stroke-width="1.5"/><line x1="2.5" y1="7" x2="5.5" y2="7" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="2.5" y1="10" x2="5.5" y2="10" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="10.5" y1="4" x2="13.5" y2="4" stroke="currentColor" stroke-opacity="0.4" stroke-width="1.5"/><line x1="10.5" y1="7" x2="13.5" y2="7" stroke="#8fd48f" stroke-width="1.5"/><line x1="10.5" y1="10" x2="13.5" y2="10" stroke="#8fd48f" stroke-width="1.5"/></svg>';
 		html += 'Open Diff</button>';
 	}
+	html += '<button class="diff-open-btn" onclick="runFileInTerminal(\'' + escapeHtml(input.file_path) + '\')" title="Run file in terminal">';
+	html += '<svg width="14" height="14" viewBox="0 0 16 16"><path d="M1 2v12h14V2H1zm13 11H2V3h12v10z" fill="currentColor"/><path d="M3 5l3 2-3 2V5zm4 4h5v1H7V9z" fill="currentColor"/></svg>';
+	html += 'Run in Terminal</button>';
+	html += '</div>';
 	html += '</div>';
 
 	return html;

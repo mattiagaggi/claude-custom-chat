@@ -127,6 +127,65 @@ export function openTerminal(name: string, command: string): void {
 }
 
 /**
+ * Run a file in the terminal with appropriate interpreter
+ */
+export function runFileInTerminal(filePath: string): void {
+	const ext = path.extname(filePath).toLowerCase();
+	const fileName = path.basename(filePath);
+
+	// Determine the appropriate command based on file extension
+	let command = '';
+	switch (ext) {
+		case '.js':
+			command = `node "${filePath}"`;
+			break;
+		case '.ts':
+			command = `ts-node "${filePath}"`;
+			break;
+		case '.py':
+			command = `python3 "${filePath}"`;
+			break;
+		case '.sh':
+			command = `bash "${filePath}"`;
+			break;
+		case '.rb':
+			command = `ruby "${filePath}"`;
+			break;
+		case '.go':
+			command = `go run "${filePath}"`;
+			break;
+		case '.java':
+			// For Java, we need to compile first
+			const javaClass = fileName.replace('.java', '');
+			command = `javac "${filePath}" && java ${javaClass}`;
+			break;
+		case '.c':
+			// For C, compile and run
+			const cOutput = fileName.replace('.c', '');
+			command = `gcc "${filePath}" -o ${cOutput} && ./${cOutput}`;
+			break;
+		case '.cpp':
+			// For C++, compile and run
+			const cppOutput = fileName.replace('.cpp', '');
+			command = `g++ "${filePath}" -o ${cppOutput} && ./${cppOutput}`;
+			break;
+		case '.rs':
+			command = `rustc "${filePath}" && ./${fileName.replace('.rs', '')}`;
+			break;
+		case '.php':
+			command = `php "${filePath}"`;
+			break;
+		default:
+			// For unknown types, try to execute directly
+			command = `"${filePath}"`;
+			break;
+	}
+
+	// Create or reuse terminal for running files
+	openTerminal(`Run ${fileName}`, command);
+}
+
+/**
  * Get text from clipboard
  */
 export async function getClipboardText(): Promise<string> {

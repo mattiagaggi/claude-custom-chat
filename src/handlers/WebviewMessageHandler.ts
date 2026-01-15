@@ -24,6 +24,7 @@ export class WebviewMessageHandler {
 			onExecuteSlashCommand: (command: string) => void;
 			onOpenDiff: (filePath: string, oldContent: string, newContent: string) => void;
 			onOpenFile: (filePath: string) => void;
+			onRunFileInTerminal: (filePath: string) => void;
 			onSelectImage: () => Promise<void>;
 			onPermissionResponse: (id: string, approved: boolean, alwaysAllow?: boolean) => void;
 			onUserQuestionResponse: (id: string, answers: Record<string, string>) => void;
@@ -108,6 +109,10 @@ export class WebviewMessageHandler {
 
 			case 'openFile':
 				this.callbacks.onOpenFile(message.filePath);
+				break;
+
+			case 'runFileInTerminal':
+				this.callbacks.onRunFileInTerminal(message.filePath);
 				break;
 
 			case 'selectImage':

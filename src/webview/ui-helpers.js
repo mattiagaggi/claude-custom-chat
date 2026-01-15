@@ -37,6 +37,13 @@ function openDiffEditor() {
 	}
 }
 
+function runFileInTerminal(filePath) {
+	vscode.postMessage({
+		type: 'runFileInTerminal',
+		filePath: filePath
+	});
+}
+
 function updateStatus(text, state = 'ready') {
 	statusTextDiv.textContent = text;
 	statusDiv.className = `status ${state}`;
