@@ -36,6 +36,8 @@ First, install the Claude Code CLI from Anthropic:
 - Or run: `npm install -g @anthropic/claude`
 - You'll need an active Claude API key or Pro/Max subscription
 
+Type `claude` in bash and check it works.
+
 ### 2. Fork This Repository
 
 ```bash
@@ -56,6 +58,8 @@ cd claude-custom-chat
 # Run PowerShell as Administrator (required for symlinks)
 .\install-dev.ps1
 ```
+
+Then you are done!!!
 
 The installation script will:
 - Automatically detect your editor (VS Code, Cursor, or other forks)
