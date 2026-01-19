@@ -114,7 +114,6 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 						</div>
 						<div class="right-controls">
 							<button class="slash-btn" onclick="showSlashCommandsModal()" title="Slash commands">/</button>
-							<button class="slash-btn" onclick="insertAtSymbol()" title="Reference files with @">@</button>
 							<button class="image-btn" id="imageBtn" onclick="selectImage()" title="Attach images">
 							<svg
 								xmlns="http://www.w3.org/2000/svg"
