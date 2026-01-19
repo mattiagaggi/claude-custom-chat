@@ -6,6 +6,13 @@ This is the first Claude extension that can modify itself!
 
 Just enter dev mode and the extension will have its own source code available as MCP. Make the change, reload the window and see the change you made. If you don't like it click CMD+Shift+C to rollback to the previous version. The command is "Claude Custom Chat: Dev Mode: Rollback to Latest Snapshot". You can also use "Claude Custom Chat: Dev Mode: Pick and Rollback to Snapshot" to rollback to any previous version.
 
+## Demo
+
+Here's a quick example showing how to ask Claude to modify the UI (removing the @ button):
+
+https://github.com/user-attachments/assets/9b6cdc09-6deb-45e7-a498-db25293704a0
+
+---
 
 This is a fork of the original [claude-code-chat](https://github.com/anthropics/claude-code-chat) repository.
 
@@ -71,12 +78,6 @@ The installation script will:
 **Note for Windows users:** The script requires administrator privileges to create symbolic links. If you see an error, right-click PowerShell and select "Run as Administrator".
 
 **That's it!** Reload your editor (`Cmd/Ctrl + R`) and press `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac) to open Claude Custom Chat.
-
-## Quick Demo
-
-Here's a quick example showing how to ask Claude to modify the UI (removing the @ button):
-
-https://github.com/user-attachments/assets/9b6cdc09-6deb-45e7-a498-db25293704a0
 
 ---
 
