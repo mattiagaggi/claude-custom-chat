@@ -72,6 +72,12 @@ The installation script will:
 
 **That's it!** Reload your editor (`Cmd/Ctrl + R`) and press `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac) to open Claude Custom Chat.
 
+## Quick Demo
+
+Here's a quick example showing how to ask Claude to modify the UI (removing the @ button):
+
+https://github.com/user-attachments/assets/9b6cdc09-6deb-45e7-a498-db25293704a0
+
 ---
 
 ## Checkpoint & Session Management
