@@ -17,6 +17,9 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Claude Custom Chat</title>
 	${styleUri ? styles(styleUri) : '<!-- No CSS URI provided -->'}
+	<script src="https://unpkg.com/cytoscape@3.32.0/dist/cytoscape.min.js"></script>
+	<script src="https://unpkg.com/cose-bilkent@4.1.0/cose-bilkent.js"></script>
+	<script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
 </head>
 <body data-telemetry-enabled="${isTelemetryEnabled}">
 	<div class="header">
@@ -25,6 +28,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		<div style="display: flex; gap: 8px; align-items: center;">
 			<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
+			<button class="btn outlined" id="graphBtn" onclick="switchMainTab('graph')" title="Codebase Graph">📊</button>
 			<button class="btn outlined" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙️</button>
 			<button class="btn outlined" id="devModeBtn" onclick="toggleDevMode()" title="Dev Mode - Make this extension self-modifiable">🛠️</button>
 			<button class="btn outlined" id="pushToBranchBtn" onclick="showPushToBranchDialog()" title="Push changes to Git">🚀 Push</button>
@@ -50,7 +54,13 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 	</div>
 
-	<div class="chat-container" id="chatContainer">
+	<!-- Main Content Tabs - Hidden, using header button instead -->
+	<div class="main-tabs" style="display: none;">
+		<button class="tab-button active" onclick="switchMainTab('chat')">Chat</button>
+		<button class="tab-button" onclick="switchMainTab('graph')">Codebase Graph</button>
+	</div>
+
+	<div class="chat-container" id="chatContainer" style="display: block;">
 		<div class="messages" id="messages"></div>
 		
 		<!-- WSL Alert for Windows users -->
@@ -150,7 +160,42 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 			</div>
 		</div>
 	</div>
-	
+
+	<!-- Graph Container -->
+	<div class="graph-container" id="graphContainer" style="display: none;">
+		<!-- View Switcher (Top Left) -->
+		<div class="view-switcher">
+			<button data-view="file-dependencies" class="active" onclick="changeView('file-dependencies')" title="View file dependency relationships and imports">
+				File Dependencies
+			</button>
+			<button data-view="logic-graph" onclick="changeView('logic-graph')" title="View business logic flow and process relationships">
+				Logic Graph
+			</button>
+		</div>
+
+		<!-- Layout Switcher (Top Right) -->
+		<div class="layout-switcher">
+			<button data-layout="auto" class="active" onclick="changeLayout('auto')" title="Automatic layout selection based on node count">
+				Auto
+			</button>
+			<button data-layout="bilkent" onclick="changeLayout('bilkent')" title="Bilkent layout algorithm">
+				Bilkent
+			</button>
+			<button data-layout="antioverlap" onclick="changeLayout('antioverlap')" title="Anti-overlap layout with maximum spacing">
+				Anti-Overlap
+			</button>
+		</div>
+
+		<!-- Graph Info (Bottom Left) -->
+		<div class="graph-info">
+			<div>0 nodes, 0 edges</div>
+			<div class="layout-info">Layout: Auto</div>
+		</div>
+
+		<!-- Graph Canvas -->
+		<div id="graphCanvas" class="graph-canvas"></div>
+	</div>
+
 	<div class="status ready" id="status">
 		<div class="status-indicator"></div>
 		<div class="status-text" id="statusText">Initializing...</div>
@@ -856,6 +901,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		<script src="${scriptUri.replace('script.js', 'modals.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'git-push.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'slash-autocomplete.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph-visualization.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'message-handler.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'event-listeners.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'init.js')}"></script>

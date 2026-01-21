@@ -222,7 +222,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "npm run copy-assets && npm run minify && tsc -p ./",
-    "copy-assets": "mkdir -p out/webview && cat src/webview/styles/base.css src/webview/styles/permissions.css src/webview/styles/permissions-management.css src/webview/styles/wsl-chat.css src/webview/styles/messages.css src/webview/styles/code-blocks.css src/webview/styles/tools-diffs.css src/webview/styles/history-modal.css src/webview/styles/mcp-modal.css src/webview/styles/slash-commands.css src/webview/styles/context-markdown.css src/webview/styles/animations-loading.css src/webview/styles/mcp-servers.css src/webview/styles/responsive.css > out/webview/styles.css && cp src/webview/*.js out/webview/",
+    "copy-assets": "mkdir -p out/webview && cat src/webview/styles/base.css src/webview/styles/permissions.css src/webview/styles/permissions-management.css src/webview/styles/wsl-chat.css src/webview/styles/messages.css src/webview/styles/code-blocks.css src/webview/styles/tools-diffs.css src/webview/styles/history-modal.css src/webview/styles/mcp-modal.css src/webview/styles/slash-commands.css src/webview/styles/context-markdown.css src/webview/styles/animations-loading.css src/webview/styles/mcp-servers.css src/webview/styles/graph-visualization.css src/webview/styles/responsive.css > out/webview/styles.css && cp src/webview/*.js out/webview/",
     "minify": "for f in out/webview/*.js; do terser \"$f\" -o \"$f\" -c -m; done && csso out/webview/styles.css -o out/webview/styles.css",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
@@ -242,5 +242,9 @@
     "eslint": "^9.25.1",
     "terser": "^5.44.1",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "cytoscape": "3.33.1",
+    "cytoscape-cose-bilkent": "^4.1.0"
   }
 }
