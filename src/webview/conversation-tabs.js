@@ -77,6 +77,7 @@ function switchToConversation(conversationId) {
 		window.currentStreamingMessageId = null;
 	}
 
+	hideGraph();
 	renderConversationTabs();
 
 	// Send message to extension to switch conversation

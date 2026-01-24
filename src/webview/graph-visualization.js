@@ -6,7 +6,7 @@
 
 let cy = null;
 let currentLayout = 'auto';
-let currentView = 'file-dependencies';
+let currentView = 'logic-graph';
 
 // Sample nodes and edges - representing a typical codebase structure
 const sampleGraphData = {
@@ -192,6 +192,13 @@ function initializeGraph() {
         return;
     }
 
+    // Force explicit dimensions since vh/% don't resolve in VSCode webviews
+    const graphContainer = document.getElementById('graphContainer');
+    const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
+    graphContainer.style.height = availableHeight + 'px';
+    container.style.height = availableHeight + 'px';
+    container.style.width = (graphContainer.offsetWidth || 279) + 'px';
+
     console.log('Graph canvas container found:', container);
     console.log('Container dimensions:', container.offsetWidth, 'x', container.offsetHeight);
 
@@ -355,29 +362,35 @@ function initializeGraph() {
 }
 
 /**
+ * Hide the graph and show chat container
+ */
+function hideGraph() {
+    const graphContainer = document.getElementById('graphContainer');
+    if (graphContainer && graphContainer.style.display !== 'none') {
+        graphContainer.style.display = 'none';
+        const chatContainer = document.getElementById('chatContainer');
+        if (chatContainer) {
+            chatContainer.style.display = 'flex';
+        }
+    }
+}
+
+/**
  * Switch main content tabs between chat and graph
  */
 function switchMainTab(tabName) {
     const chatContainer = document.getElementById('chatContainer');
     const graphContainer = document.getElementById('graphContainer');
-    const tabs = document.querySelectorAll('.tab-button');
+    const historyDiv = document.getElementById('conversationHistory');
 
-    // Update tab button states
-    tabs.forEach(tab => {
-        if (tab.textContent.toLowerCase().includes(tabName)) {
-            tab.classList.add('active');
-        } else {
-            tab.classList.remove('active');
-        }
-    });
-
-    // Show/hide containers
     if (tabName === 'chat') {
-        chatContainer.style.display = 'block';
         graphContainer.style.display = 'none';
+        if (historyDiv) historyDiv.style.display = 'none';
+        chatContainer.style.display = 'flex';
     } else if (tabName === 'graph') {
         console.log('Switching to graph view');
         chatContainer.style.display = 'none';
+        if (historyDiv) historyDiv.style.display = 'none';
         graphContainer.style.display = 'block';
 
         // Initialize graph if not already done
@@ -386,7 +399,11 @@ function switchMainTab(tabName) {
             setTimeout(() => initializeGraph(), 100);
         } else {
             console.log('Graph already initialized, resizing...');
-            // Resize to fit container
+            const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
+            graphContainer.style.height = availableHeight + 'px';
+            const canvas = document.getElementById('graphCanvas');
+            canvas.style.height = availableHeight + 'px';
+            canvas.style.width = graphContainer.offsetWidth + 'px';
             cy.resize();
             cy.fit();
         }
@@ -495,6 +512,7 @@ function centerGraph() {
 
 // Make functions globally available
 window.switchMainTab = switchMainTab;
+window.hideGraph = hideGraph;
 window.changeLayout = changeLayout;
 window.changeView = changeView;
 window.fitGraph = fitGraph;

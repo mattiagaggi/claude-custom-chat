@@ -10,7 +10,7 @@ import getScript from './script';
 import styles from './ui-styles'
 
 
-const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, coseBilkentUri?: string) => `<!DOCTYPE html>
+const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, layoutBaseUri?: string, coseBaseUri?: string, coseBilkentUri?: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -18,6 +18,8 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 	<title>Claude Custom Chat</title>
 	${styleUri ? styles(styleUri) : '<!-- No CSS URI provided -->'}
 	${cytoscapeUri ? `<script src="${cytoscapeUri}"></script>` : ''}
+	${layoutBaseUri ? `<script src="${layoutBaseUri}"></script>` : ''}
+	${coseBaseUri ? `<script src="${coseBaseUri}"></script>` : ''}
 	${coseBilkentUri ? `<script src="${coseBilkentUri}"></script>` : ''}
 </head>
 <body data-telemetry-enabled="${isTelemetryEnabled}">
@@ -164,10 +166,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 	<div class="graph-container" id="graphContainer" style="display: none;">
 		<!-- View Switcher (Top Left) -->
 		<div class="view-switcher">
-			<button data-view="file-dependencies" class="active" onclick="changeView('file-dependencies')" title="View file dependency relationships and imports">
-				File Dependencies
-			</button>
-			<button data-view="logic-graph" onclick="changeView('logic-graph')" title="View business logic flow and process relationships">
+			<button data-view="logic-graph" class="active" onclick="changeView('logic-graph')" title="View business logic flow and process relationships">
 				Logic Graph
 			</button>
 		</div>
