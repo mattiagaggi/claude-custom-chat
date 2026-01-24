@@ -10,16 +10,15 @@ import getScript from './script';
 import styles from './ui-styles'
 
 
-const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string) => `<!DOCTYPE html>
+const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, coseBilkentUri?: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Claude Custom Chat</title>
 	${styleUri ? styles(styleUri) : '<!-- No CSS URI provided -->'}
-	<script src="https://unpkg.com/cytoscape@3.32.0/dist/cytoscape.min.js"></script>
-	<script src="https://unpkg.com/cose-bilkent@4.1.0/cose-bilkent.js"></script>
-	<script src="https://unpkg.com/cytoscape-cose-bilkent@4.1.0/cytoscape-cose-bilkent.js"></script>
+	${cytoscapeUri ? `<script src="${cytoscapeUri}"></script>` : ''}
+	${coseBilkentUri ? `<script src="${coseBilkentUri}"></script>` : ''}
 </head>
 <body data-telemetry-enabled="${isTelemetryEnabled}">
 	<div class="header">

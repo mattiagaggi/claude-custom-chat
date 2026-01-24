@@ -803,7 +803,9 @@ class ClaudeChatProvider {
 	private getHtml(webview: vscode.Webview): string {
 		const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'styles.css')).toString();
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'script.js')).toString();
-		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri);
+		const cytoscapeUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape', 'dist', 'cytoscape.min.js')).toString();
+		const coseBilkentUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-cose-bilkent', 'cytoscape-cose-bilkent.js')).toString();
+		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, coseBilkentUri);
 	}
 
 	private async openFileWithEditHighlight(filePath: string, oldString: string, _newString: string) {
