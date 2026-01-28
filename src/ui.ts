@@ -10,7 +10,7 @@ import getScript from './script';
 import styles from './ui-styles'
 
 
-const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, layoutBaseUri?: string, coseBaseUri?: string, coseBilkentUri?: string) => `<!DOCTYPE html>
+const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, layoutBaseUri?: string, coseBaseUri?: string, coseBilkentUri?: string, dagreUri?: string, cytoscapeDagreUri?: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
@@ -21,6 +21,8 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 	${layoutBaseUri ? `<script src="${layoutBaseUri}"></script>` : ''}
 	${coseBaseUri ? `<script src="${coseBaseUri}"></script>` : ''}
 	${coseBilkentUri ? `<script src="${coseBilkentUri}"></script>` : ''}
+	${dagreUri ? `<script src="${dagreUri}"></script>` : ''}
+	${cytoscapeDagreUri ? `<script src="${cytoscapeDagreUri}"></script>` : ''}
 </head>
 <body data-telemetry-enabled="${isTelemetryEnabled}">
 	<div class="header">
@@ -164,6 +166,22 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 
 	<!-- Graph Container -->
 	<div class="graph-container" id="graphContainer" style="display: none;">
+		<!-- Graph Header with Generate Button -->
+		<div class="graph-header">
+			<div id="backendStatus" class="backend-status" onclick="showBackendInstructions()" title="Backend connection status">
+				<span style="color: #6b7280;">● Checking...</span>
+			</div>
+			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()" title="Generate logic graph from codebase">
+				Generate Graph
+			</button>
+			<button class="btn outlined" onclick="refreshModifiedFiles()" title="Refresh modified files highlighting">
+				Refresh
+			</button>
+			<button class="btn outlined" onclick="switchMainTab('chat')" title="Back to chat">
+				Back to Chat
+			</button>
+		</div>
+
 		<!-- View Switcher (Top Left) -->
 		<div class="view-switcher">
 			<button data-view="logic-graph" class="active" onclick="changeView('logic-graph')" title="View business logic flow and process relationships">

@@ -243,9 +243,27 @@ export class WebviewMessageHandler {
 				// These messages are handled directly in extension.ts or can be safely ignored
 				break;
 
+			case 'getWorkspacePath':
+				// Return workspace path for graph generation
+				this.handleGetWorkspacePath();
+				break;
+
 			default:
 				console.log('Unknown message type:', message.type);
 		}
+	}
+
+	/**
+	 * Handle workspace path request for graph generation
+	 */
+	private handleGetWorkspacePath(): void {
+		const workspaceFolders = vscode.workspace.workspaceFolders;
+		const workspacePath = workspaceFolders && workspaceFolders.length > 0
+			? workspaceFolders[0].uri.fsPath
+			: null;
+
+		// Note: This requires access to webview - the extension.ts will handle posting the message
+		// This is just a placeholder - the actual implementation is in extension.ts
 	}
 
 	/**

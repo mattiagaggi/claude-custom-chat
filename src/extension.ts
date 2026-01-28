@@ -275,6 +275,13 @@ class ClaudeChatProvider {
 			case 'selectImageFile': { const p = await utilSelectImageFile(); if (p) this.postMessage({ type: 'imagePath', path: p }); return; }
 			case 'copyToClipboard': return vscode.env.clipboard.writeText(message.text);
 			case 'requestNextSuggestion': return this.idleDetectionManager.showNextSuggestion();
+			case 'getWorkspacePath': {
+				const workspaceFolders = vscode.workspace.workspaceFolders;
+				const workspacePath = workspaceFolders && workspaceFolders.length > 0
+					? workspaceFolders[0].uri.fsPath
+					: null;
+				return this.postMessage({ type: 'workspacePath', path: workspacePath });
+			}
 			case 'toggleDevMode': {
 				if (!this.devModeManager) {
 					vscode.window.showErrorMessage('Dev Mode Manager not initialized');
@@ -807,7 +814,9 @@ class ClaudeChatProvider {
 		const layoutBaseUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'layout-base', 'layout-base.js')).toString();
 		const coseBaseUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cose-base', 'cose-base.js')).toString();
 		const coseBilkentUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-cose-bilkent', 'cytoscape-cose-bilkent.js')).toString();
-		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, layoutBaseUri, coseBaseUri, coseBilkentUri);
+		const dagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'dagre', 'dist', 'dagre.min.js')).toString();
+		const cytoscapeDagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-dagre', 'cytoscape-dagre.js')).toString();
+		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, layoutBaseUri, coseBaseUri, coseBilkentUri, dagreUri, cytoscapeDagreUri);
 	}
 
 	private async openFileWithEditHighlight(filePath: string, oldString: string, _newString: string) {

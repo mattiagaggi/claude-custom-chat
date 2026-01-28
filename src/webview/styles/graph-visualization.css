@@ -43,6 +43,58 @@
     display: none;
 }
 
+/* Graph Header with Generate Button */
+.graph-header {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    z-index: 1000;
+    background-color: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.graph-header .btn {
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-family: var(--vscode-font-family);
+    border: 1px solid transparent;
+}
+
+.graph-header .btn.primary {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+}
+
+.graph-header .btn.primary:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.graph-header .btn.primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.graph-header .btn.outlined {
+    background-color: transparent;
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-panel-border);
+}
+
+.graph-header .btn.outlined:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
 /* Graph Canvas */
 #graphCanvas {
     width: 100%;
@@ -293,4 +345,39 @@
 .vscode-high-contrast .layout-switcher,
 .vscode-high-contrast .graph-info {
     border-width: 2px;
+}
+
+/* Backend Status Indicator */
+.backend-status {
+    font-size: 11px;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.backend-status:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Progress Panel */
+#progressPanel {
+    font-family: var(--vscode-font-family);
+}
+
+#progressPanel::-webkit-scrollbar {
+    width: 6px;
+}
+
+#progressPanel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#progressPanel::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 3px;
+}
+
+#progressPanel::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
 }

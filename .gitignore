@@ -9,3 +9,5 @@ backup
 # MCP server compiled outputs (generated from TypeScript)
 claude-custom-chat-permissions-mcp/mcp-permissions.js
 mcp-permissions.js
+# Graph visualization cache
+.graph_cache/
