@@ -104,12 +104,22 @@
 
 /* Graph Canvas */
 #graphCanvas {
-    width: 100%;
-    height: 100vh;
-    background: var(--vscode-editor-background);
     position: absolute;
     top: 0;
     left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--vscode-editor-background);
+    z-index: 0;
+}
+
+/* Ensure overlay controls always stay clickable above the graph canvas */
+.graph-header,
+.view-switcher,
+.layout-switcher,
+.graph-info {
+    pointer-events: auto;
+    z-index: 1000;
 }
 
 /* View Switcher - Top Left */

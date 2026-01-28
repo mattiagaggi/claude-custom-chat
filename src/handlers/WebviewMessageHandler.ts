@@ -305,7 +305,7 @@ export class WebviewMessageHandler {
 					uri = vscode.Uri.file(filePath);
 				}
 			}
-			await vscode.window.showTextDocument(uri);
+			await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
 		} catch (error: any) {
 			vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);
 		}

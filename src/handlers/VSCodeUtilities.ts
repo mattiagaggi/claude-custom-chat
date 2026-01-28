@@ -42,7 +42,7 @@ export function openDiff(filePath: string, oldContent: string, newContent: strin
  * Open a file in the editor
  */
 export function openFile(filePath: string): void {
-	vscode.window.showTextDocument(vscode.Uri.file(filePath));
+	vscode.window.showTextDocument(vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
 }
 
 /**

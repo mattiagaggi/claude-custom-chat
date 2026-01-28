@@ -330,6 +330,9 @@ async function generateGraph() {
         const cytoscapeData = convertLogicGraphToCytoscape(result.graph);
         renderGraph(cytoscapeData);
 
+        // Cache graph state for persistence
+        saveGraphState();
+
         // Show stats in log
         if (result.stats) {
             console.log('Graph generation stats:', result.stats);
@@ -541,11 +544,10 @@ function registerLayouts() {
  * Setup container dimensions
  */
 function setupContainerDimensions(container) {
+    // Let CSS handle sizing via position:absolute + top/bottom/left/right on #graphCanvas.
+    // Only ensure graphContainer has a height so the absolute-positioned canvas works.
     const graphContainer = document.getElementById('graphContainer');
-    const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
-    graphContainer.style.height = availableHeight + 'px';
-    container.style.height = availableHeight + 'px';
-    container.style.width = (graphContainer.offsetWidth || 279) + 'px';
+    graphContainer.style.height = '100vh';
 }
 
 /**
@@ -800,18 +802,8 @@ function expandNode(nodeId) {
     cy.add(subElements);
     expandedNodes.add(nodeId);
 
-    cy.layout({
-        name: 'cose-bilkent',
-        animate: true,
-        animationDuration: 600,
-        fit: false,
-        padding: 50,
-        randomize: false,
-        idealEdgeLength: 250,
-        nodeRepulsion: 18000,
-        gravity: 2.0,
-        numIter: 1000,
-    }).run();
+    // Manually position sub-nodes below the parent (no layout re-run)
+    positionChildNodesBelow(nodeId);
 }
 
 /**
@@ -857,17 +849,128 @@ function expandSubNodeToFiles(subNodeId) {
     cy.add(elements);
     expandedNodes.add(subNodeId);
 
-    cy.layout({
-        name: 'cose-bilkent',
-        animate: true,
-        animationDuration: 600,
-        fit: false,
-        randomize: false,
-        idealEdgeLength: 200,
-        nodeRepulsion: 15000,
-        gravity: 2.0,
-        numIter: 800,
-    }).run();
+    // Position file nodes straight down from the sub-node (no layout re-run)
+    positionFileNodesBelow(subNodeId);
+}
+
+/**
+ * Position child sub-nodes below their parent node without re-running layout.
+ * Locks existing nodes, positions new sub-nodes downward with collision detection.
+ */
+function positionChildNodesBelow(parentId) {
+    const parentNode = cy.getElementById(parentId);
+    if (parentNode.length === 0) return;
+
+    const parentPos = parentNode.position();
+    const parentHeight = parentNode.outerHeight() || 80;
+
+    // Find newly added sub-nodes
+    const subNodes = cy.elements(`[id^="${parentId}_sub_"]`).nodes();
+    const fileNodes = cy.elements(`[id^="${parentId}_file_"]`).nodes();
+    const allChildren = subNodes.add(fileNodes);
+
+    if (allChildren.length === 0) return;
+
+    // Lock all existing nodes to prevent movement
+    cy.nodes().forEach(n => {
+        if (!n.id().startsWith(`${parentId}_sub_`) && !n.id().startsWith(`${parentId}_file_`)) {
+            n.lock();
+        }
+    });
+
+    // Collect existing nodes for collision detection
+    const existingNodes = cy.nodes().filter(n =>
+        !n.id().startsWith(`${parentId}_sub_`) && !n.id().startsWith(`${parentId}_file_`)
+    );
+
+    const subNodeWidth = 120;
+    const subNodeHeight = 60;
+    const verticalSpacing = 150;
+    const horizontalSpacing = 80;
+
+    // Linear arrangement below parent
+    const totalWidth = allChildren.length * subNodeWidth + (allChildren.length - 1) * horizontalSpacing;
+    const startX = parentPos.x - totalWidth / 2;
+    const baseY = parentPos.y + parentHeight / 2 + verticalSpacing;
+
+    allChildren.forEach((child, index) => {
+        let x = startX + index * (subNodeWidth + horizontalSpacing);
+        let y = baseY;
+
+        // Limit horizontal spread
+        const maxOffset = Math.min(totalWidth / 2, 300);
+        if (Math.abs(x - parentPos.x) > maxOffset) {
+            x = parentPos.x + Math.sign(x - parentPos.x) * maxOffset;
+        }
+
+        // Collision detection
+        for (let attempt = 0; attempt < 10; attempt++) {
+            let collision = false;
+            existingNodes.forEach(existing => {
+                const ePos = existing.position();
+                const eW = existing.outerWidth() || 80;
+                const eH = existing.outerHeight() || 80;
+                if (Math.abs(x - ePos.x) < (subNodeWidth + eW) / 2 + 50 &&
+                    Math.abs(y - ePos.y) < (subNodeHeight + eH) / 2 + 50) {
+                    collision = true;
+                }
+            });
+            if (!collision) break;
+            y += 100;
+        }
+
+        child.position({ x, y });
+        child.lock();
+    });
+
+    // Unlock main nodes only (not sub-nodes/file-nodes)
+    cy.nodes().forEach(n => {
+        if (!n.id().includes('_sub_') && !n.id().includes('_file_')) {
+            n.unlock();
+        }
+    });
+}
+
+/**
+ * Position file nodes straight down below their parent sub-node.
+ */
+function positionFileNodesBelow(subNodeId) {
+    const parentNode = cy.getElementById(subNodeId);
+    if (parentNode.length === 0) return;
+
+    const parentPos = parentNode.position();
+    const parentHeight = parentNode.outerHeight() || 60;
+
+    const fileNodes = cy.elements(`[id^="${subNodeId}_file_"]`).nodes();
+    if (fileNodes.length === 0) return;
+
+    const existingNodes = cy.nodes().filter(n => !n.id().startsWith(`${subNodeId}_file_`));
+
+    const verticalSpacing = 60;
+
+    fileNodes.forEach((fileNode, index) => {
+        let x = parentPos.x;
+        let y = parentPos.y + parentHeight / 2 + (index + 1) * verticalSpacing;
+
+        // Collision detection
+        for (let attempt = 0; attempt < 10; attempt++) {
+            let collision = false;
+            existingNodes.forEach(existing => {
+                const ePos = existing.position();
+                const eW = existing.outerWidth() || 80;
+                const eH = existing.outerHeight() || 40;
+                if (Math.abs(x - ePos.x) < (100 + eW) / 2 + 20 &&
+                    Math.abs(y - ePos.y) < (40 + eH) / 2 + 20) {
+                    collision = true;
+                }
+            });
+            if (!collision) break;
+            y += 50;
+        }
+
+        fileNode.position({ x, y });
+        fileNode.lock();
+    });
 }
 
 /**
@@ -892,12 +995,7 @@ function collapseNode(nodeId) {
         }
     }
 
-    cy.layout({
-        name: 'cose-bilkent',
-        animate: true,
-        animationDuration: 400,
-        fit: false,
-    }).run();
+    // No layout re-run — existing nodes stay in place
 }
 
 /**
@@ -965,6 +1063,26 @@ function setupEventHandlers() {
             hideNodeDetails();
         }
     });
+}
+
+/**
+ * Highlight a node and its connected hierarchy
+ */
+function highlightHierarchy(nodeId) {
+    if (!cy) return;
+
+    const node = cy.getElementById(nodeId);
+    if (node.length === 0) return;
+
+    // Reset all
+    cy.elements().removeClass('highlighted').removeClass('dimmed');
+
+    // Get connected elements
+    const connected = node.neighborhood().add(node);
+
+    // Dim everything, then highlight connected
+    cy.elements().addClass('dimmed');
+    connected.removeClass('dimmed').addClass('highlighted');
 }
 
 /**
@@ -1260,11 +1378,6 @@ function switchMainTab(tabName) {
             }, 100);
         } else if (cy) {
             console.log('Graph already initialized, resizing...');
-            const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
-            graphContainer.style.height = availableHeight + 'px';
-            const canvas = document.getElementById('graphCanvas');
-            canvas.style.height = availableHeight + 'px';
-            canvas.style.width = graphContainer.offsetWidth + 'px';
             cy.resize();
             cy.fit();
         }
@@ -1385,6 +1498,37 @@ async function refreshModifiedFiles() {
     }
 }
 
+/**
+ * Save graph state to VS Code webview state for persistence across panel close/reopen
+ */
+function saveGraphState() {
+    if (typeof vscode !== 'undefined' && currentGraphData) {
+        const state = vscode.getState() || {};
+        state.graphData = currentGraphData;
+        state.expandedNodes = Array.from(expandedNodes);
+        state.currentLayout = currentLayout;
+        state.currentView = currentView;
+        vscode.setState(state);
+    }
+}
+
+/**
+ * Restore graph state from VS Code webview state
+ */
+function restoreGraphState() {
+    if (typeof vscode !== 'undefined') {
+        const state = vscode.getState();
+        if (state && state.graphData) {
+            currentGraphData = state.graphData;
+            currentLayout = state.currentLayout || 'auto';
+            currentView = state.currentView || 'logic-graph';
+            console.log('Restored cached graph state');
+            return true;
+        }
+    }
+    return false;
+}
+
 // Make functions globally available
 window.switchMainTab = switchMainTab;
 window.hideGraph = hideGraph;
@@ -1399,6 +1543,18 @@ window.refreshModifiedFiles = refreshModifiedFiles;
 window.checkBackendConnection = checkBackendConnection;
 window.checkBackendAndRetry = checkBackendAndRetry;
 window.showBackendInstructions = showBackendInstructions;
+window.restoreGraphState = restoreGraphState;
 
 // Check backend connection on load
 setTimeout(checkBackendConnection, 1000);
+
+// Restore cached graph on load if webview was previously disposed
+setTimeout(() => {
+    if (!cy && !currentGraphData && !isGeneratingGraph) {
+        if (restoreGraphState() && currentGraphData) {
+            console.log('Restoring graph from cache...');
+            const cytoscapeData = convertLogicGraphToCytoscape(currentGraphData);
+            renderGraph(cytoscapeData);
+        }
+    }
+}, 500);
