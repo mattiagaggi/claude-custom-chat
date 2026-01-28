@@ -293,7 +293,18 @@ export class WebviewMessageHandler {
 	 */
 	public async openFile(filePath: string): Promise<void> {
 		try {
-			const uri = vscode.Uri.file(filePath);
+			let uri: vscode.Uri;
+			if (filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath)) {
+				uri = vscode.Uri.file(filePath);
+			} else {
+				// Resolve relative path against workspace
+				const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+				if (workspaceFolder) {
+					uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
+				} else {
+					uri = vscode.Uri.file(filePath);
+				}
+			}
 			await vscode.window.showTextDocument(uri);
 		} catch (error: any) {
 			vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);

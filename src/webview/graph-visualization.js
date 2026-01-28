@@ -11,6 +11,7 @@ let isGeneratingGraph = false;
 let currentGraphData = null;
 let modifiedFiles = new Set();
 let backendConnected = false;
+let expandedNodes = new Set();
 
 // Graph backend API configuration
 const GRAPH_BACKEND_URL = 'http://localhost:8000/api';
@@ -113,7 +114,8 @@ function convertLogicGraphToCytoscape(logicGraph) {
         3: '#8b5cf6',  // Sub-nodes level 3 - purple
     };
 
-    // Process nodes
+    // Process nodes - only add main (level 0) nodes initially
+    // Sub-nodes are stored on the parent and expanded on click
     for (const node of logicGraph.nodes) {
         const isModified = isNodeModified(node);
         const level = node.metadata?.level || 0;
@@ -128,45 +130,11 @@ function convertLogicGraphToCytoscape(logicGraph) {
                 files: node.files,
                 isModified: isModified,
                 group: level === 0 ? 'main' : `sub-${level}`,
+                // Store sub-nodes and sub-edges on the parent for on-demand expansion
+                subNodes: node.metadata?.subNodes || [],
+                subEdges: node.metadata?.subEdges || [],
             }
         });
-
-        // Process sub-nodes if they exist
-        if (node.metadata?.subNodes) {
-            for (const subNode of node.metadata.subNodes) {
-                const subIsModified = isNodeModified(subNode);
-                const subLevel = subNode.metadata?.level || 1;
-
-                nodes.push({
-                    data: {
-                        id: subNode.id,
-                        label: subNode.label,
-                        description: subNode.description,
-                        type: 'logic',
-                        level: subLevel,
-                        files: subNode.files,
-                        isModified: subIsModified,
-                        parentNodeId: node.id,
-                        group: `sub-${subLevel}`,
-                    }
-                });
-            }
-        }
-
-        // Process sub-edges if they exist
-        if (node.metadata?.subEdges) {
-            for (const subEdge of node.metadata.subEdges) {
-                edges.push({
-                    data: {
-                        id: subEdge.id,
-                        source: subEdge.source,
-                        target: subEdge.target,
-                        label: subEdge.label,
-                        description: subEdge.description,
-                    }
-                });
-            }
-        }
     }
 
     // Process main edges
@@ -305,7 +273,7 @@ async function generateGraph() {
             },
             body: JSON.stringify({
                 workspacePath: workspacePath,
-                fileExtensions: ['py'],
+                fileExtensions: ['py', 'js', 'jsx', 'ts', 'tsx', 'rs', 'go'],
                 excludePatterns: ['__pycache__', 'node_modules', '.git', 'venv', '.venv', 'env', '.env']
             }),
         });
@@ -450,6 +418,12 @@ async function getWorkspacePath() {
  * Render the graph with the given data
  */
 function renderGraph(graphData) {
+    // Always clear placeholder content before rendering
+    const container = document.getElementById('graphCanvas');
+    if (container && !cy) {
+        container.innerHTML = '';
+    }
+
     if (!cy) {
         initializeGraphWithData(graphData);
     } else {
@@ -486,6 +460,9 @@ function initializeGraphWithData(graphData) {
         return;
     }
 
+    // Clear any placeholder content so Cytoscape can use the container
+    container.innerHTML = '';
+
     setupContainerDimensions(container);
 
     const colors = getThemeColors();
@@ -499,6 +476,10 @@ function initializeGraphWithData(graphData) {
         minZoom: 0.1,
         maxZoom: 2.5,
         wheelSensitivity: 0.15,
+        userPanningEnabled: true,
+        panningEnabled: true,
+        userZoomingEnabled: true,
+        boxSelectionEnabled: false,
     });
 
     setupEventHandlers();
@@ -656,6 +637,31 @@ function getCytoscapeStyles(colors) {
             }
         },
         {
+            selector: 'node[?isSubNode]',
+            style: {
+                'width': 60,
+                'height': 60,
+                'font-size': '10px',
+                'shape': 'round-rectangle',
+            }
+        },
+        {
+            selector: 'node[?isFileNode]',
+            style: {
+                'width': 50,
+                'height': 50,
+                'font-size': '9px',
+                'shape': 'rectangle',
+                'background-color': function(ele) {
+                    return colors.node['sub-2'] || '#f59e0b';
+                },
+                'border-color': function(ele) {
+                    return colors.node['sub-2'] || '#f59e0b';
+                },
+                'cursor': 'pointer',
+            }
+        },
+        {
             selector: 'node:selected',
             style: {
                 'border-width': 4,
@@ -695,23 +701,244 @@ function getCytoscapeStyles(colors) {
 }
 
 /**
+ * Expand a main node to show its sub-nodes
+ */
+function expandNode(nodeId) {
+    if (!cy || expandedNodes.has(nodeId)) return;
+
+    const node = cy.getElementById(nodeId);
+    if (node.length === 0) return;
+
+    const nodeData = node.data();
+    const subElements = [];
+
+    if (nodeData.subNodes && nodeData.subNodes.length > 0) {
+        // Create sub-node elements
+        nodeData.subNodes.forEach((subNode, index) => {
+            const subNodeId = `${nodeId}_sub_${index}`;
+            const isFileNode = subNode.metadata?.isFileNode === true;
+            subElements.push({
+                data: {
+                    id: subNodeId,
+                    label: subNode.label,
+                    level: subNode.metadata?.level || 1,
+                    isSubNode: true,
+                    isFileNode: isFileNode,
+                    parentId: nodeId,
+                    description: subNode.description,
+                    files: subNode.files || [],
+                    filePath: isFileNode ? (subNode.files?.[0] || '') : '',
+                    group: isFileNode ? 'file' : 'sub-1',
+                    originalId: subNode.id,
+                }
+            });
+            // Edge from parent to sub-node
+            subElements.push({
+                data: {
+                    id: `${nodeId}_to_${subNodeId}`,
+                    source: nodeId,
+                    target: subNodeId,
+                    label: 'contains',
+                    isSubEdge: true,
+                }
+            });
+        });
+
+        // Map and add sub-edges between sub-nodes
+        if (nodeData.subEdges && nodeData.subEdges.length > 0) {
+            const idMap = {};
+            nodeData.subNodes.forEach((sn, i) => {
+                idMap[sn.id] = `${nodeId}_sub_${i}`;
+            });
+            nodeData.subEdges.forEach((subEdge) => {
+                const mappedSource = idMap[subEdge.source] || subEdge.source;
+                const mappedTarget = idMap[subEdge.target] || subEdge.target;
+                subElements.push({
+                    data: {
+                        id: `${nodeId}_${subEdge.id}`,
+                        source: mappedSource,
+                        target: mappedTarget,
+                        label: subEdge.label,
+                        description: subEdge.description,
+                        isSubEdge: true,
+                    }
+                });
+            });
+        }
+    } else if (nodeData.files && nodeData.files.length > 0) {
+        // No sub-nodes, show files directly
+        nodeData.files.forEach((file, index) => {
+            const fileName = file.split('/').pop() || file;
+            const fileNodeId = `${nodeId}_file_${index}`;
+            subElements.push({
+                data: {
+                    id: fileNodeId,
+                    label: fileName,
+                    level: 1,
+                    isFileNode: true,
+                    isSubNode: true,
+                    parentId: nodeId,
+                    filePath: file,
+                    description: file,
+                    group: 'file',
+                }
+            });
+            subElements.push({
+                data: {
+                    id: `${nodeId}_to_${fileNodeId}`,
+                    source: nodeId,
+                    target: fileNodeId,
+                    label: 'contains',
+                    isSubEdge: true,
+                }
+            });
+        });
+    } else {
+        return; // Nothing to expand
+    }
+
+    cy.add(subElements);
+    expandedNodes.add(nodeId);
+
+    cy.layout({
+        name: 'cose-bilkent',
+        animate: true,
+        animationDuration: 600,
+        fit: false,
+        padding: 50,
+        randomize: false,
+        idealEdgeLength: 250,
+        nodeRepulsion: 18000,
+        gravity: 2.0,
+        numIter: 1000,
+    }).run();
+}
+
+/**
+ * Expand a sub-node to show individual file nodes
+ */
+function expandSubNodeToFiles(subNodeId) {
+    if (!cy || expandedNodes.has(subNodeId)) return;
+
+    const node = cy.getElementById(subNodeId);
+    if (node.length === 0) return;
+
+    const files = node.data('files') || [];
+    if (files.length === 0) return;
+
+    const elements = [];
+    files.forEach((file, index) => {
+        const fileName = file.split('/').pop() || file;
+        const fileNodeId = `${subNodeId}_file_${index}`;
+        elements.push({
+            data: {
+                id: fileNodeId,
+                label: fileName,
+                level: 2,
+                isFileNode: true,
+                isSubNode: true,
+                parentId: subNodeId,
+                filePath: file,
+                description: file,
+                group: 'file',
+            }
+        });
+        elements.push({
+            data: {
+                id: `${subNodeId}_to_${fileNodeId}`,
+                source: subNodeId,
+                target: fileNodeId,
+                label: 'contains',
+                isSubEdge: true,
+            }
+        });
+    });
+
+    cy.add(elements);
+    expandedNodes.add(subNodeId);
+
+    cy.layout({
+        name: 'cose-bilkent',
+        animate: true,
+        animationDuration: 600,
+        fit: false,
+        randomize: false,
+        idealEdgeLength: 200,
+        nodeRepulsion: 15000,
+        gravity: 2.0,
+        numIter: 800,
+    }).run();
+}
+
+/**
+ * Collapse a node, removing all its child elements
+ */
+function collapseNode(nodeId) {
+    if (!cy || !expandedNodes.has(nodeId)) return;
+
+    // Remove sub-nodes, file nodes, and their edges
+    const toRemove = cy.elements(`[id^="${nodeId}_sub_"], [id^="${nodeId}_file_"], [id^="${nodeId}_to_"]`);
+    // Also remove edges referencing sub-node IDs
+    const subEdges = cy.elements(`[id*="${nodeId}_sub_"]`);
+
+    cy.remove(toRemove);
+    cy.remove(subEdges);
+
+    // Remove from expanded set (including any expanded sub-nodes)
+    expandedNodes.delete(nodeId);
+    for (const id of expandedNodes) {
+        if (id.startsWith(`${nodeId}_sub_`)) {
+            expandedNodes.delete(id);
+        }
+    }
+
+    cy.layout({
+        name: 'cose-bilkent',
+        animate: true,
+        animationDuration: 400,
+        fit: false,
+    }).run();
+}
+
+/**
  * Setup event handlers for the graph
  */
 function setupEventHandlers() {
-    // Click handler for nodes
+    // Click handler for nodes - expand/collapse on tap
     cy.on('tap', 'node', function(evt) {
         const node = evt.target;
-        cy.elements().removeClass('highlighted').removeClass('dimmed');
-        node.addClass('highlighted');
-        const neighbors = node.neighborhood();
-        neighbors.addClass('highlighted');
-        cy.elements().not(neighbors).not(node).addClass('dimmed');
+        const nodeId = node.id();
 
-        // Show node details
+        // File node: open the file in VS Code
+        if (node.data('isFileNode')) {
+            const filePath = node.data('filePath') || node.data('description');
+            if (filePath && typeof vscode !== 'undefined') {
+                vscode.postMessage({ type: 'openFile', filePath: filePath });
+            }
+            return;
+        }
+
+        // Sub-node: expand to show files, or collapse
+        if (node.data('isSubNode')) {
+            if (expandedNodes.has(nodeId)) {
+                collapseNode(nodeId);
+            } else {
+                expandSubNodeToFiles(nodeId);
+            }
+            showNodeDetails(node.data());
+            return;
+        }
+
+        // Main node: expand to show sub-nodes, or collapse
+        if (expandedNodes.has(nodeId)) {
+            collapseNode(nodeId);
+        } else {
+            expandNode(nodeId);
+        }
         showNodeDetails(node.data());
     });
 
-    // Double-click to reset
+    // Double-click to reset highlights
     cy.on('dbltap', function(evt) {
         if (evt.target === cy) {
             cy.elements().removeClass('highlighted').removeClass('dimmed');
@@ -998,9 +1225,11 @@ function switchMainTab(tabName) {
         graphContainer.style.display = 'block';
 
         // Initialize graph if not already done
-        if (!cy && !currentGraphData) {
+        if (!cy && !currentGraphData && !isGeneratingGraph) {
             console.log('Graph not initialized, checking backend...');
             setTimeout(async () => {
+                // Don't show placeholder if generation started in the meantime
+                if (cy || currentGraphData || isGeneratingGraph) return;
                 setupContainerDimensions(document.getElementById('graphCanvas'));
                 const connected = await checkBackendConnection();
                 if (connected) {

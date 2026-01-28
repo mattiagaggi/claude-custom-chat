@@ -167,7 +167,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 
 	<!-- Graph Container -->
 	<div class="graph-container" id="graphContainer" style="display: none;">
-		<!-- Graph Header with Generate Button -->
+		<!-- Graph Header (Top Center) - Action buttons -->
 		<div class="graph-header">
 			<div id="backendStatus" class="backend-status" onclick="showBackendInstructions()" title="Backend connection status">
 				<span style="color: #6b7280;">● Checking...</span>
