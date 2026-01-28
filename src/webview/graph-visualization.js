@@ -919,22 +919,42 @@ function setupEventHandlers() {
         }
 
         // Sub-node: expand to show files, or collapse
+        // Collapse sibling sub-nodes first (exclusive expansion)
         if (node.data('isSubNode')) {
+            const parentId = node.data('parentId');
             if (expandedNodes.has(nodeId)) {
                 collapseNode(nodeId);
             } else {
+                // Collapse any expanded sibling sub-nodes
+                if (parentId) {
+                    for (const expandedId of Array.from(expandedNodes)) {
+                        if (expandedId.startsWith(`${parentId}_sub_`) && expandedId !== nodeId) {
+                            collapseNode(expandedId);
+                        }
+                    }
+                }
                 expandSubNodeToFiles(nodeId);
             }
+            highlightHierarchy(nodeId);
             showNodeDetails(node.data());
             return;
         }
 
         // Main node: expand to show sub-nodes, or collapse
+        // Collapse other expanded main nodes first (exclusive expansion)
         if (expandedNodes.has(nodeId)) {
             collapseNode(nodeId);
         } else {
+            // Collapse any other expanded main nodes
+            for (const expandedId of Array.from(expandedNodes)) {
+                // Only collapse top-level expanded nodes (no underscore = main node)
+                if (!expandedId.includes('_sub_') && expandedId !== nodeId) {
+                    collapseNode(expandedId);
+                }
+            }
             expandNode(nodeId);
         }
+        highlightHierarchy(nodeId);
         showNodeDetails(node.data());
     });
 

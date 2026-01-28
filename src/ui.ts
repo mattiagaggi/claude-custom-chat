@@ -7,7 +7,7 @@
  */
 
 import getScript from './script';
-import styles from './ui-styles'
+import styles from './ui-styles';
 
 
 const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, layoutBaseUri?: string, coseBaseUri?: string, coseBilkentUri?: string, dagreUri?: string, cytoscapeDagreUri?: string, cspSource?: string) => `<!DOCTYPE html>
