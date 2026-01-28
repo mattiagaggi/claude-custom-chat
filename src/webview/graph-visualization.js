@@ -471,6 +471,8 @@ function initializeGraphWithData(graphData) {
     const colors = getThemeColors();
     const layoutConfig = getLayoutConfig(graphData.nodes.length);
 
+    console.log('[initializeGraphWithData] container size:', container.offsetWidth, 'x', container.offsetHeight, 'elements:', graphData.nodes.length, 'nodes', graphData.edges.length, 'edges');
+
     cy = cytoscape({
         container: container,
         elements: [...graphData.nodes, ...graphData.edges],
@@ -489,8 +491,10 @@ function initializeGraphWithData(graphData) {
     updateGraphInfo();
 
     setTimeout(() => {
-        cy.resize();
-        cy.fit();
+        if (cy) {
+            cy.resize();
+            cy.fit();
+        }
     }, 100);
 }
 
@@ -544,10 +548,12 @@ function registerLayouts() {
  * Setup container dimensions
  */
 function setupContainerDimensions(container) {
-    // Let CSS handle sizing via position:absolute + top/bottom/left/right on #graphCanvas.
-    // Only ensure graphContainer has a height so the absolute-positioned canvas works.
+    // Ensure graphContainer has an explicit height so the absolute-positioned canvas works
     const graphContainer = document.getElementById('graphContainer');
-    graphContainer.style.height = '100vh';
+    const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
+    graphContainer.style.height = availableHeight + 'px';
+    container.style.height = availableHeight + 'px';
+    container.style.width = (graphContainer.offsetWidth || 279) + 'px';
 }
 
 /**
@@ -1330,12 +1336,19 @@ function hideNodeDetails() {
  * Hide the graph and show chat container
  */
 function hideGraph() {
+    window._graphTabActive = false;
+    if (typeof renderConversationTabs === 'function') renderConversationTabs();
     const graphContainer = document.getElementById('graphContainer');
     if (graphContainer && graphContainer.style.display !== 'none') {
         graphContainer.style.display = 'none';
-        const chatContainer = document.getElementById('chatContainer');
-        if (chatContainer) {
-            chatContainer.style.display = 'flex';
+        // Only show chat if history isn't currently visible
+        const historyDiv = document.getElementById('conversationHistory');
+        const historyVisible = historyDiv && historyDiv.style.display !== 'none' && historyDiv.style.display !== '';
+        if (!historyVisible) {
+            const chatContainer = document.getElementById('chatContainer');
+            if (chatContainer) {
+                chatContainer.style.display = 'flex';
+            }
         }
     }
 }
@@ -1347,8 +1360,13 @@ function switchMainTab(tabName) {
     const chatContainer = document.getElementById('chatContainer');
     const graphContainer = document.getElementById('graphContainer');
     const historyDiv = document.getElementById('conversationHistory');
-
     const statusBar = document.getElementById('status');
+
+    // Track graph tab state and re-render tabs
+    window._graphTabActive = (tabName === 'graph');
+    if (typeof renderConversationTabs === 'function') {
+        renderConversationTabs();
+    }
 
     if (tabName === 'chat') {
         graphContainer.style.display = 'none';
@@ -1360,7 +1378,7 @@ function switchMainTab(tabName) {
         chatContainer.style.display = 'none';
         if (historyDiv) historyDiv.style.display = 'none';
         if (statusBar) statusBar.style.display = 'none';
-        graphContainer.style.display = 'block';
+        graphContainer.style.display = 'flex';
 
         // Initialize graph if not already done
         if (!cy && !currentGraphData && !isGeneratingGraph) {
@@ -1378,8 +1396,12 @@ function switchMainTab(tabName) {
             }, 100);
         } else if (cy) {
             console.log('Graph already initialized, resizing...');
-            cy.resize();
-            cy.fit();
+            setTimeout(() => {
+                if (cy) {
+                    cy.resize();
+                    cy.fit();
+                }
+            }, 100);
         }
     }
 }
@@ -1394,14 +1416,9 @@ function changeLayout(layoutType) {
     const nodeCount = cy.nodes().length;
     const layoutConfig = getLayoutConfig(nodeCount);
 
-    // Update button states
-    document.querySelectorAll('.layout-switcher button').forEach(btn => {
-        if (btn.dataset.layout === layoutType) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    // Sync dropdown
+    const select = document.getElementById('graphStyleSelect');
+    if (select) select.value = layoutType;
 
     // Run new layout
     const layout = cy.layout(layoutConfig);
@@ -1433,24 +1450,15 @@ function changeView(viewType) {
  * Update graph info panel
  */
 function updateGraphInfo() {
-    const graphInfo = document.querySelector('.graph-info');
+    const graphInfo = document.getElementById('graphInfoInline');
     if (graphInfo) {
         if (cy) {
             const nodeCount = cy.nodes().length;
             const edgeCount = cy.edges().length;
-            const layoutInfo = getLayoutInfoText(nodeCount);
             const modifiedCount = cy.nodes().filter(n => n.data('isModified')).length;
-
-            graphInfo.innerHTML = `
-                <div>${nodeCount} nodes, ${edgeCount} edges</div>
-                ${modifiedCount > 0 ? `<div style="color: var(--vscode-errorForeground);">${modifiedCount} modified</div>` : ''}
-                <div class="layout-info">Layout: ${layoutInfo}</div>
-            `;
+            graphInfo.textContent = `${nodeCount} nodes, ${edgeCount} edges${modifiedCount > 0 ? ` (${modifiedCount} modified)` : ''}`;
         } else {
-            graphInfo.innerHTML = `
-                <div>0 nodes, 0 edges</div>
-                <div class="layout-info">Layout: Auto</div>
-            `;
+            graphInfo.textContent = '0 nodes, 0 edges';
         }
     }
 }

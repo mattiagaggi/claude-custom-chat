@@ -132,13 +132,8 @@ function renderConversationTabs() {
 		return;
 	}
 
-	// Show/hide tabs container based on number of conversations
-	if (activeConversations.size > 1) {
-		tabsContainer.style.display = 'flex';
-	} else {
-		tabsContainer.style.display = 'none';
-		return;
-	}
+	// Always show tab bar (Graph tab is always present)
+	tabsContainer.style.display = 'flex';
 
 	// Clear existing tabs
 	tabsList.innerHTML = '';
@@ -168,7 +163,7 @@ function renderConversationTabs() {
 	activeConversations.forEach((conversation, conversationId) => {
 		const tab = document.createElement('div');
 		tab.className = 'conversation-tab';
-		if (conversationId === currentActiveConversationId) {
+		if (conversationId === currentActiveConversationId && !window._graphTabActive) {
 			tab.classList.add('active');
 		}
 
@@ -223,13 +218,26 @@ function renderConversationTabs() {
 
 		// Click handler to switch conversation
 		tab.onclick = () => {
-			if (conversationId !== currentActiveConversationId) {
+			if (conversationId !== currentActiveConversationId || window._graphTabActive) {
 				switchToConversation(conversationId);
 			}
 		};
 
 		tabsList.appendChild(tab);
 	});
+
+	// Add Graph tab as a permanent tab
+	const graphTab = document.createElement('div');
+	graphTab.className = 'conversation-tab graph-tab';
+	if (window._graphTabActive) {
+		graphTab.classList.add('active');
+	}
+	const graphTitle = document.createElement('span');
+	graphTitle.className = 'conversation-tab-title';
+	graphTitle.textContent = 'Graph';
+	graphTab.appendChild(graphTitle);
+	graphTab.onclick = () => switchMainTab('graph');
+	tabsList.appendChild(graphTab);
 }
 
 /**

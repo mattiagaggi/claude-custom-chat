@@ -32,7 +32,6 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		<div style="display: flex; gap: 8px; align-items: center;">
 			<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
-			<button class="btn outlined" id="graphBtn" onclick="switchMainTab('graph')" title="Codebase Graph">📊</button>
 			<button class="btn outlined" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙️</button>
 			<button class="btn outlined" id="devModeBtn" onclick="toggleDevMode()" title="Dev Mode - Make this extension self-modifiable">🛠️</button>
 			<button class="btn outlined" id="pushToBranchBtn" onclick="showPushToBranchDialog()" title="Push changes to Git">🚀 Push</button>
@@ -51,20 +50,14 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 	</div>
 
-	<!-- Active Conversations Tabs -->
-	<div id="activeConversationTabs" class="active-conversation-tabs" style="display: none;">
+	<!-- Conversation Tabs (includes Graph tab) -->
+	<div id="activeConversationTabs" class="active-conversation-tabs" style="display: flex;">
 		<div id="conversationTabsList" class="conversation-tabs-list">
 			<!-- Active conversation tabs will be rendered here -->
 		</div>
 	</div>
 
-	<!-- Main Content Tabs - Hidden, using header button instead -->
-	<div class="main-tabs" style="display: none;">
-		<button class="tab-button active" onclick="switchMainTab('chat')">Chat</button>
-		<button class="tab-button" onclick="switchMainTab('graph')">Codebase Graph</button>
-	</div>
-
-	<div class="chat-container" id="chatContainer" style="display: block;">
+	<div class="chat-container" id="chatContainer" style="display: flex;">
 		<div class="messages" id="messages"></div>
 		
 		<!-- WSL Alert for Windows users -->
@@ -167,50 +160,25 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 
 	<!-- Graph Container -->
 	<div class="graph-container" id="graphContainer" style="display: none;">
-		<!-- Graph Header (Top Center) - Action buttons -->
-		<div class="graph-header">
+		<!-- Graph Toolbar -->
+		<div class="graph-toolbar" id="graphTabControls">
 			<div id="backendStatus" class="backend-status" onclick="showBackendInstructions()" title="Backend connection status">
 				<span style="color: #6b7280;">● Checking...</span>
 			</div>
-			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()" title="Generate logic graph from codebase">
-				Generate Graph
-			</button>
-			<button class="btn outlined" onclick="refreshModifiedFiles()" title="Refresh modified files highlighting">
-				Refresh
-			</button>
-			<button class="btn outlined" onclick="switchMainTab('chat')" title="Back to chat">
-				Back to Chat
-			</button>
-		</div>
-
-		<!-- View Switcher (Top Left) -->
-		<div class="view-switcher">
-			<button data-view="logic-graph" class="active" onclick="changeView('logic-graph')" title="View business logic flow and process relationships">
-				Logic Graph
-			</button>
-		</div>
-
-		<!-- Layout Switcher (Top Right) -->
-		<div class="layout-switcher">
-			<button data-layout="auto" class="active" onclick="changeLayout('auto')" title="Automatic layout selection based on node count">
-				Auto
-			</button>
-			<button data-layout="bilkent" onclick="changeLayout('bilkent')" title="Bilkent layout algorithm">
-				Bilkent
-			</button>
-			<button data-layout="antioverlap" onclick="changeLayout('antioverlap')" title="Anti-overlap layout with maximum spacing">
-				Anti-Overlap
-			</button>
-		</div>
-
-		<!-- Graph Info (Bottom Left) -->
-		<div class="graph-info">
-			<div>0 nodes, 0 edges</div>
-			<div class="layout-info">Layout: Auto</div>
+			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()">Generate</button>
+			<button class="btn outlined" onclick="refreshModifiedFiles()">Refresh</button>
+			<select class="graph-style-select" id="graphStyleSelect" onchange="changeLayout(this.value)">
+				<option value="auto" selected>Auto</option>
+				<option value="bilkent">Bilkent</option>
+				<option value="antioverlap">Anti-Overlap</option>
+			</select>
+			<div class="graph-info-inline" id="graphInfoInline">0 nodes, 0 edges</div>
 		</div>
 
 		<!-- Graph Canvas -->
-		<div id="graphCanvas" class="graph-canvas"></div>
+		<div class="graph-canvas-wrapper">
+			<div id="graphCanvas"></div>
+		</div>
 	</div>
 
 	<div class="status ready" id="status">

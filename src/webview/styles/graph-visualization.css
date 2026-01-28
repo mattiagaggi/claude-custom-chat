@@ -3,44 +3,16 @@
  * Matches the reference vscode_graph_extension implementation
  */
 
-/* Main Content Tabs */
-.main-tabs {
-    display: flex;
-    gap: 4px;
-    padding: 8px 16px;
-    background: var(--vscode-editor-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.tab-button {
-    padding: 8px 16px;
-    background: transparent;
-    border: none;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    font-size: 13px;
-    font-family: var(--vscode-font-family);
-    border-radius: 4px;
-    transition: background-color 0.2s;
-}
-
-.tab-button:hover {
-    background: var(--vscode-toolbar-hoverBackground);
-}
-
-.tab-button.active {
-    background: var(--vscode-tab-activeBackground);
-    border-bottom: 2px solid var(--vscode-focusBorder);
-}
-
-/* Graph Container - Full screen */
+/* Graph Container */
 .graph-container {
     width: 100%;
-    height: 100vh;
+    flex: 1;
+    min-height: 0;
     background: var(--vscode-editor-background);
     position: relative;
     overflow: hidden;
     display: none;
+    flex-direction: column;
 }
 
 .graph-canvas {
@@ -49,25 +21,21 @@
     touch-action: none;
 }
 
-/* Graph Header with Action Buttons - Top Center */
-.graph-header {
-    position: absolute;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
+/* Graph toolbar below tabs */
+.graph-toolbar {
     display: flex;
     gap: 8px;
     align-items: center;
-    z-index: 1000;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
-    padding: 8px 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
 }
 
-.graph-header .btn {
-    padding: 6px 12px;
+.graph-toolbar .btn {
+    padding: 4px 10px;
     border-radius: 4px;
     cursor: pointer;
     font-size: 12px;
@@ -77,32 +45,50 @@
     border: 1px solid transparent;
 }
 
-.graph-header .btn.primary {
+.graph-toolbar .btn.primary {
     background-color: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border-color: var(--vscode-button-background);
 }
 
-.graph-header .btn.primary:hover {
+.graph-toolbar .btn.primary:hover {
     background-color: var(--vscode-button-hoverBackground);
 }
 
-.graph-header .btn.primary:disabled {
+.graph-toolbar .btn.primary:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-.graph-header .btn.outlined {
+.graph-toolbar .btn.outlined {
     background-color: transparent;
     color: var(--vscode-foreground);
     border-color: var(--vscode-panel-border);
 }
 
-.graph-header .btn.outlined:hover {
+.graph-toolbar .btn.outlined:hover {
     background-color: var(--vscode-list-hoverBackground);
 }
 
-/* Graph Canvas */
+.graph-info-inline {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+}
+
+.graph-style-select {
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-dropdown-background);
+    color: var(--vscode-dropdown-foreground);
+    font-size: 12px;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+}
+
+/* Graph Canvas - absolute fill for Cytoscape */
 #graphCanvas {
     position: absolute;
     top: 0;
@@ -113,117 +99,14 @@
     z-index: 0;
 }
 
-/* Ensure overlay controls always stay clickable above the graph canvas */
-.graph-header,
-.view-switcher,
-.layout-switcher,
-.graph-info {
-    pointer-events: auto;
-    z-index: 1000;
+/* Wrapper: takes remaining space, provides positioning context for canvas */
+.graph-canvas-wrapper {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-/* View Switcher - Top Left */
-.view-switcher {
-    position: absolute;
-    top: 10px;
-    left: 10px;
-    display: flex;
-    gap: 4px;
-    z-index: 1000;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
-    padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.view-switcher button {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    font-family: var(--vscode-font-family);
-}
-
-.view-switcher button.active {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.view-switcher button:not(.active) {
-    background-color: transparent;
-    color: var(--vscode-foreground);
-}
-
-.view-switcher button:not(.active):hover {
-    background-color: var(--vscode-list-hoverBackground);
-}
-
-/* Layout Switcher - Top Right */
-.layout-switcher {
-    position: absolute;
-    top: 60px;
-    right: 10px;
-    display: flex;
-    gap: 4px;
-    z-index: 1000;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 6px;
-    padding: 4px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.layout-switcher button {
-    padding: 6px 12px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 12px;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    font-family: var(--vscode-font-family);
-}
-
-.layout-switcher button.active {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.layout-switcher button:not(.active) {
-    background-color: transparent;
-    color: var(--vscode-foreground);
-}
-
-.layout-switcher button:not(.active):hover {
-    background-color: var(--vscode-list-hoverBackground);
-}
-
-/* Graph Info - Bottom Left */
-.graph-info {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    z-index: 1000;
-    background-color: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
-    padding: 8px;
-    font-size: 11px;
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    color: var(--vscode-foreground);
-    font-family: var(--vscode-font-family);
-}
-
-.graph-info .layout-info {
-    font-size: 10px;
-    opacity: 0.8;
-}
 
 /* Repository Title - Top Center */
 .repository-title {
