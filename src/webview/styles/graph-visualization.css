@@ -78,14 +78,20 @@
 }
 
 .graph-style-select {
-    padding: 5px 8px;
+    padding: 4px 10px;
     border-radius: 4px;
-    border: 1px solid var(--vscode-panel-border);
-    background: var(--vscode-dropdown-background);
-    color: var(--vscode-dropdown-foreground);
+    border: 1px solid transparent;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
     font-size: 12px;
+    font-weight: 500;
     font-family: var(--vscode-font-family);
     cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.graph-style-select:hover {
+    background: var(--vscode-button-hoverBackground);
 }
 
 /* Graph Canvas - absolute fill for Cytoscape */

@@ -166,7 +166,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 				<span style="color: #6b7280;">● Checking...</span>
 			</div>
 			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()">Generate</button>
-			<button class="btn outlined" onclick="refreshModifiedFiles()">Refresh</button>
+			<button class="btn primary" onclick="refreshModifiedFiles()">Refresh</button>
 			<select class="graph-style-select" id="graphStyleSelect" onchange="changeLayout(this.value)">
 				<option value="auto" selected>Auto</option>
 				<option value="bilkent">Bilkent</option>

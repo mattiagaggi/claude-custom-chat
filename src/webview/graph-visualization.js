@@ -490,12 +490,21 @@ function initializeGraphWithData(graphData) {
     setupEventHandlers();
     updateGraphInfo();
 
+    // Cytoscape needs the container to have real pixel dimensions.
+    // The absolute-positioned canvas inherits size from its wrapper,
+    // but we need to wait a frame for layout to settle after display:flex is set.
     setTimeout(() => {
         if (cy) {
             cy.resize();
             cy.fit();
         }
-    }, 100);
+    }, 50);
+    setTimeout(() => {
+        if (cy) {
+            cy.resize();
+            cy.fit();
+        }
+    }, 200);
 }
 
 /**
@@ -548,12 +557,15 @@ function registerLayouts() {
  * Setup container dimensions
  */
 function setupContainerDimensions(container) {
-    // Ensure graphContainer has an explicit height so the absolute-positioned canvas works
-    const graphContainer = document.getElementById('graphContainer');
-    const availableHeight = window.innerHeight || document.documentElement.clientHeight || 600;
-    graphContainer.style.height = availableHeight + 'px';
-    container.style.height = availableHeight + 'px';
-    container.style.width = (graphContainer.offsetWidth || 279) + 'px';
+    // Give the canvas explicit pixel dimensions so Cytoscape can render.
+    // Size from the wrapper (flex:1) which fills remaining space below the toolbar.
+    const wrapper = container.parentElement;
+    if (!wrapper) return;
+
+    const width = wrapper.clientWidth || wrapper.offsetWidth || 279;
+    const height = wrapper.clientHeight || wrapper.offsetHeight || (window.innerHeight - 100);
+    container.style.width = width + 'px';
+    container.style.height = height + 'px';
 }
 
 /**
@@ -1111,18 +1123,7 @@ function updateNodeStyles() {
  * Show graph placeholder
  */
 function showGraphPlaceholder() {
-    const container = document.getElementById('graphCanvas');
-    if (container) {
-        container.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--vscode-descriptionForeground);">
-                <div style="font-size: 48px; margin-bottom: 16px;">📊</div>
-                <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">No Graph Generated</div>
-                <div style="font-size: 13px; text-align: center; max-width: 300px; margin-bottom: 16px;">
-                    Click the "Generate Graph" button to analyze your codebase and create a logic graph visualization.
-                </div>
-            </div>
-        `;
-    }
+    // No placeholder — canvas stays empty until a graph is generated
 }
 
 /**
@@ -1552,6 +1553,17 @@ window.checkBackendConnection = checkBackendConnection;
 window.checkBackendAndRetry = checkBackendAndRetry;
 window.showBackendInstructions = showBackendInstructions;
 window.restoreGraphState = restoreGraphState;
+
+// Resize graph on window resize
+window.addEventListener('resize', () => {
+    if (cy) {
+        const canvas = document.getElementById('graphCanvas');
+        if (canvas) {
+            setupContainerDimensions(canvas);
+        }
+        cy.resize();
+    }
+});
 
 // Check backend connection on load
 setTimeout(checkBackendConnection, 1000);
