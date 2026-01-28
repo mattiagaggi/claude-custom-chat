@@ -163,16 +163,16 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		<!-- Graph Toolbar -->
 		<div class="graph-toolbar" id="graphTabControls">
 			<div id="backendStatus" class="backend-status" onclick="showBackendInstructions()" title="Backend connection status">
-				<span style="color: #6b7280;">● Checking...</span>
+				●
 			</div>
-			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()">Generate</button>
-			<button class="btn primary" onclick="refreshModifiedFiles()">Refresh</button>
+			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()">Gen</button>
+			<button class="btn primary" onclick="refreshModifiedFiles()">Ref</button>
 			<select class="graph-style-select" id="graphStyleSelect" onchange="changeLayout(this.value)">
 				<option value="auto" selected>Auto</option>
 				<option value="bilkent">Bilkent</option>
 				<option value="antioverlap">Anti-Overlap</option>
 			</select>
-			<div class="graph-info-inline" id="graphInfoInline">0 nodes, 0 edges</div>
+			<span class="graph-info-inline" id="graphInfoInline"></span>
 		</div>
 
 		<!-- Graph Canvas -->

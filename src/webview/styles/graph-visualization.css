@@ -24,25 +24,32 @@
 /* Graph toolbar below tabs */
 .graph-toolbar {
     display: flex;
-    gap: 8px;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 4px;
     align-items: center;
-    padding: 6px 12px;
+    padding: 4px 6px;
     border-bottom: 1px solid var(--vscode-panel-border);
     background: var(--vscode-editor-background);
     flex-shrink: 0;
     position: relative;
     z-index: 10;
+    overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .graph-toolbar .btn {
-    padding: 4px 10px;
+    display: inline-flex !important;
+    padding: 3px 8px !important;
     border-radius: 4px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     transition: all 0.2s ease;
     font-family: var(--vscode-font-family);
     border: 1px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .graph-toolbar .btn.primary {
@@ -72,22 +79,27 @@
 
 .graph-info-inline {
     margin-left: auto;
-    font-size: 11px;
+    font-size: 10px;
     color: var(--vscode-descriptionForeground);
     white-space: nowrap;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .graph-style-select {
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 4px;
     border: 1px solid transparent;
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 500;
     font-family: var(--vscode-font-family);
     cursor: pointer;
     transition: all 0.2s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .graph-style-select:hover {
@@ -257,11 +269,13 @@
 
 /* Backend Status Indicator */
 .backend-status {
-    font-size: 11px;
-    padding: 4px 8px;
+    font-size: 10px;
+    padding: 2px 6px;
     cursor: pointer;
     border-radius: 4px;
     transition: background-color 0.2s;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .backend-status:hover {

@@ -557,15 +557,17 @@ function registerLayouts() {
  * Setup container dimensions
  */
 function setupContainerDimensions(container) {
-    // Give the canvas explicit pixel dimensions so Cytoscape can render.
-    // Size from the wrapper (flex:1) which fills remaining space below the toolbar.
-    const wrapper = container.parentElement;
-    if (!wrapper) return;
+    // Cytoscape needs explicit pixel dimensions. Calculate from viewport minus
+    // header, tabs bar, and toolbar above the canvas.
+    const graphContainer = document.getElementById('graphContainer');
+    const toolbar = document.getElementById('graphTabControls');
+    const toolbarHeight = toolbar ? toolbar.offsetHeight : 35;
+    const containerTop = graphContainer ? graphContainer.getBoundingClientRect().top : 80;
+    const availableHeight = window.innerHeight - containerTop - toolbarHeight;
+    const availableWidth = graphContainer ? graphContainer.clientWidth : window.innerWidth;
 
-    const width = wrapper.clientWidth || wrapper.offsetWidth || 279;
-    const height = wrapper.clientHeight || wrapper.offsetHeight || (window.innerHeight - 100);
-    container.style.width = width + 'px';
-    container.style.height = height + 'px';
+    container.style.width = Math.max(availableWidth, 200) + 'px';
+    container.style.height = Math.max(availableHeight, 200) + 'px';
 }
 
 /**
