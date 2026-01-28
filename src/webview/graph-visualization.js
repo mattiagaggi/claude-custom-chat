@@ -983,22 +983,31 @@ function switchMainTab(tabName) {
     const graphContainer = document.getElementById('graphContainer');
     const historyDiv = document.getElementById('conversationHistory');
 
+    const statusBar = document.getElementById('status');
+
     if (tabName === 'chat') {
         graphContainer.style.display = 'none';
         if (historyDiv) historyDiv.style.display = 'none';
         chatContainer.style.display = 'flex';
+        if (statusBar) statusBar.style.display = '';
     } else if (tabName === 'graph') {
         console.log('Switching to graph view');
         chatContainer.style.display = 'none';
         if (historyDiv) historyDiv.style.display = 'none';
+        if (statusBar) statusBar.style.display = 'none';
         graphContainer.style.display = 'block';
 
         // Initialize graph if not already done
         if (!cy && !currentGraphData) {
-            console.log('Graph not initialized, showing placeholder...');
-            setTimeout(() => {
+            console.log('Graph not initialized, checking backend...');
+            setTimeout(async () => {
                 setupContainerDimensions(document.getElementById('graphCanvas'));
-                showGraphPlaceholder();
+                const connected = await checkBackendConnection();
+                if (connected) {
+                    showGraphPlaceholder();
+                } else {
+                    showBackendInstructions();
+                }
             }, 100);
         } else if (cy) {
             console.log('Graph already initialized, resizing...');

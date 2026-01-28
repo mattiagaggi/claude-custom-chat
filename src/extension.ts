@@ -816,7 +816,8 @@ class ClaudeChatProvider {
 		const coseBilkentUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-cose-bilkent', 'cytoscape-cose-bilkent.js')).toString();
 		const dagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'dagre', 'dist', 'dagre.min.js')).toString();
 		const cytoscapeDagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-dagre', 'cytoscape-dagre.js')).toString();
-		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, layoutBaseUri, coseBaseUri, coseBilkentUri, dagreUri, cytoscapeDagreUri);
+		const cspSource = webview.cspSource;
+		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, layoutBaseUri, coseBaseUri, coseBilkentUri, dagreUri, cytoscapeDagreUri, cspSource);
 	}
 
 	private async openFileWithEditHighlight(filePath: string, oldString: string, _newString: string) {
