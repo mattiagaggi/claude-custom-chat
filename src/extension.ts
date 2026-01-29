@@ -501,7 +501,7 @@ class ClaudeChatProvider {
 	}
 
 	private async fetchLogicGraphContext(workspacePath: string): Promise<string | null> {
-		const url = `http://localhost:8000/api/graph/context?workspacePath=${encodeURIComponent(workspacePath)}`;
+		const url = `http://localhost:8000/api/graph/context?workspacePath=${encodeURIComponent(workspacePath)}&includeSummaries=true`;
 		const http = require('http');
 		return new Promise((resolve) => {
 			const req = http.get(url, { timeout: 5000 }, (res: any) => {
