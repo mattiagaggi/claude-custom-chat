@@ -52,7 +52,7 @@ function showProgressPanel(initialMessage) {
     hideProgressPanel();
 
     const graphContainer = document.getElementById('graphContainer');
-    if (!graphContainer) return;
+    if (!graphContainer) { return; }
 
     const progressPanel = document.createElement('div');
     progressPanel.id = 'progressPanel';
@@ -107,16 +107,16 @@ function showProgressPanel(initialMessage) {
 
 function updateProgressLog(step, message, data) {
     const progressLogs = document.getElementById('progressLogs');
-    if (!progressLogs) return;
+    if (!progressLogs) { return; }
 
     const entry = document.createElement('div');
     entry.className = 'progress-log-entry';
-    if (step === 'error') entry.classList.add('error');
-    if (step === 'complete') entry.classList.add('complete');
+    if (step === 'error') { entry.classList.add('error'); }
+    if (step === 'complete') { entry.classList.add('complete'); }
 
     let icon = '→';
-    if (step === 'complete') icon = '✓';
-    if (step === 'error') icon = '✗';
+    if (step === 'complete') { icon = '✓'; }
+    if (step === 'error') { icon = '✗'; }
     if (step === 'summarizing' && data?.current) {
         icon = `[${data.current}/${data.total}]`;
     }
