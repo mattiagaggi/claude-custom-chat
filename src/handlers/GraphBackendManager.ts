@@ -118,12 +118,20 @@ export function buildContextFromCachedGraph(context: vscode.ExtensionContext): s
 		}
 		lines.push('');
 	}
+	const nodeMap = new Map<string, string>();
+	for (const node of saved.graph.nodes) {
+		if (node.data?.id && node.data?.label) {
+			nodeMap.set(node.data.id, node.data.label);
+		}
+	}
 	if (saved.graph.edges?.length) {
 		lines.push('## Relationships');
 		for (const edge of saved.graph.edges) {
 			const e = edge.data;
 			if (!e) continue;
-			lines.push(`- ${e.source} → ${e.target}${e.label ? ' (' + e.label + ')' : ''}`);
+			const src = nodeMap.get(e.source) || e.source;
+			const tgt = nodeMap.get(e.target) || e.target;
+			lines.push(`- ${src} → ${tgt}${e.label ? ' (' + e.label + ')' : ''}`);
 		}
 	}
 	return lines.join('\n');
