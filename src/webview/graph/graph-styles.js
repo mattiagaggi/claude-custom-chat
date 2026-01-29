@@ -116,6 +116,15 @@ function getCytoscapeStyles(colors) {
             }
         },
         {
+            selector: 'edge[?isModified]',
+            style: {
+                'line-color': colors.node.modified,
+                'target-arrow-color': colors.node.modified,
+                'width': 4,
+                'opacity': 1,
+            }
+        },
+        {
             selector: 'node.dimmed',
             style: {
                 'opacity': 0.3,

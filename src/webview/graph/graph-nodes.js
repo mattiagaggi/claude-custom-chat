@@ -15,6 +15,10 @@ function expandNode(nodeId) {
         nodeData.subNodes.forEach((subNode, index) => {
             const subNodeId = `${nodeId}_sub_${index}`;
             const isFileNode = subNode.metadata?.isFileNode === true;
+            const subNodeModified = modifiedFiles.size > 0 && (subNode.files || []).some(file =>
+                modifiedFiles.has(file) ||
+                Array.from(modifiedFiles).some(mf => file.endsWith(mf) || mf.endsWith(file))
+            );
             subElements.push({
                 data: {
                     id: subNodeId,
@@ -22,6 +26,7 @@ function expandNode(nodeId) {
                     level: subNode.metadata?.level || 1,
                     isSubNode: true,
                     isFileNode: isFileNode,
+                    isModified: subNodeModified,
                     parentId: nodeId,
                     description: subNode.description,
                     files: subNode.files || [],
@@ -37,6 +42,7 @@ function expandNode(nodeId) {
                     target: subNodeId,
                     label: 'contains',
                     isSubEdge: true,
+                    isModified: subNodeModified || nodeData.isModified,
                 }
             });
         });
@@ -65,6 +71,10 @@ function expandNode(nodeId) {
         nodeData.files.forEach((file, index) => {
             const fileName = file.split('/').pop() || file;
             const fileNodeId = `${nodeId}_file_${index}`;
+            const fileIsModified = modifiedFiles.size > 0 && (
+                modifiedFiles.has(file) ||
+                Array.from(modifiedFiles).some(mf => file.endsWith(mf) || mf.endsWith(file))
+            );
             subElements.push({
                 data: {
                     id: fileNodeId,
@@ -72,6 +82,7 @@ function expandNode(nodeId) {
                     level: 1,
                     isFileNode: true,
                     isSubNode: true,
+                    isModified: fileIsModified,
                     parentId: nodeId,
                     filePath: file,
                     description: file,
@@ -85,6 +96,7 @@ function expandNode(nodeId) {
                     target: fileNodeId,
                     label: 'contains',
                     isSubEdge: true,
+                    isModified: fileIsModified || nodeData.isModified,
                 }
             });
         });
@@ -107,10 +119,15 @@ function expandSubNodeToFiles(subNodeId) {
     const files = node.data('files') || [];
     if (files.length === 0) return;
 
+    const parentModified = node.data('isModified');
     const elements = [];
     files.forEach((file, index) => {
         const fileName = file.split('/').pop() || file;
         const fileNodeId = `${subNodeId}_file_${index}`;
+        const fileIsModified = modifiedFiles.size > 0 && (
+            modifiedFiles.has(file) ||
+            Array.from(modifiedFiles).some(mf => file.endsWith(mf) || mf.endsWith(file))
+        );
         elements.push({
             data: {
                 id: fileNodeId,
@@ -118,6 +135,7 @@ function expandSubNodeToFiles(subNodeId) {
                 level: 2,
                 isFileNode: true,
                 isSubNode: true,
+                isModified: fileIsModified,
                 parentId: subNodeId,
                 filePath: file,
                 description: file,
@@ -131,6 +149,7 @@ function expandSubNodeToFiles(subNodeId) {
                 target: fileNodeId,
                 label: 'contains',
                 isSubEdge: true,
+                isModified: fileIsModified || parentModified,
             }
         });
     });

@@ -41,8 +41,51 @@ export function openDiff(filePath: string, oldContent: string, newContent: strin
 /**
  * Open a file in the editor
  */
-export function openFile(filePath: string): void {
-	vscode.window.showTextDocument(vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+export async function openFile(filePath: string): Promise<void> {
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+
+	// Try the path as-is first (works for valid absolute local paths)
+	let uri = filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath)
+		? vscode.Uri.file(filePath)
+		: workspaceFolder
+			? vscode.Uri.joinPath(workspaceFolder.uri, filePath)
+			: vscode.Uri.file(filePath);
+
+	try {
+		await vscode.workspace.fs.stat(uri);
+		await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+		return;
+	} catch {
+		// File not found at that path — try resolving as a container/relative path
+	}
+
+	if (workspaceFolder) {
+		// Strip common container prefixes (e.g. /app/, /src/, /workspace/, /home/user/project/)
+		// and try resolving the remainder against the workspace
+		const stripped = filePath.replace(/^\/(?:app|src|workspace|project|code)\//, '');
+		if (stripped !== filePath) {
+			const resolvedUri = vscode.Uri.joinPath(workspaceFolder.uri, stripped);
+			try {
+				await vscode.workspace.fs.stat(resolvedUri);
+				await vscode.window.showTextDocument(resolvedUri, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+				return;
+			} catch {
+				// Still not found
+			}
+		}
+
+		// Last resort: try just the filename in the workspace
+		const fileName = filePath.split('/').pop();
+		if (fileName) {
+			const found = await vscode.workspace.findFiles(`**/${fileName}`, '**/node_modules/**', 1);
+			if (found.length > 0) {
+				await vscode.window.showTextDocument(found[0], { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+				return;
+			}
+		}
+	}
+
+	vscode.window.showErrorMessage(`File not found: ${filePath}`);
 }
 
 /**

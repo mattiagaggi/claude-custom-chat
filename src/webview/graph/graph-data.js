@@ -26,6 +26,8 @@ function convertLogicGraphToCytoscape(logicGraph) {
         });
     }
 
+    const modifiedNodeIds = new Set(nodes.filter(n => n.data.isModified).map(n => n.data.id));
+
     for (const edge of logicGraph.edges) {
         edges.push({
             data: {
@@ -34,6 +36,7 @@ function convertLogicGraphToCytoscape(logicGraph) {
                 target: edge.target,
                 label: edge.label,
                 description: edge.description,
+                isModified: modifiedNodeIds.has(edge.source) || modifiedNodeIds.has(edge.target),
             }
         });
     }
