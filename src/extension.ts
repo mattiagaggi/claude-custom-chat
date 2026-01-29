@@ -5,6 +5,8 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as http from 'http';
+import { ChildProcess, spawn } from 'child_process';
 import getHtml from './ui';
 import { ProcessManager, ConversationManager, PermissionManager, DevModeManager } from './managers';
 import {
@@ -30,7 +32,74 @@ import {
 	getPlatformInfo
 } from './handlers';
 
+// --- Graph Backend Process Management ---
+let graphBackendProcess: ChildProcess | null = null;
+
+function getGraphBackendConfig() {
+	const config = vscode.workspace.getConfiguration('claudeCodeChat.graphBackend');
+	const backendDir = config.get<string>('path', '');
+	const port = config.get<number>('port', 8000);
+	let pythonPath = config.get<string>('pythonPath', '');
+	if (!pythonPath && backendDir) {
+		pythonPath = path.join(backendDir, '.venv', 'bin', 'python');
+	}
+	return { backendDir, pythonPath, port };
+}
+
+function isGraphBackendRunning(): Promise<boolean> {
+	const { port } = getGraphBackendConfig();
+	return new Promise((resolve) => {
+		const req = http.get(`http://localhost:${port}/api/health`, { timeout: 2000 }, (res) => {
+			resolve(res.statusCode === 200);
+		});
+		req.on('error', () => resolve(false));
+		req.on('timeout', () => { req.destroy(); resolve(false); });
+	});
+}
+
+async function startGraphBackend(): Promise<void> {
+	const { backendDir, pythonPath, port } = getGraphBackendConfig();
+	if (!backendDir) {
+		console.log('[GraphBackend] No backend path configured, skipping auto-start');
+		return;
+	}
+	// Kill any previously tracked process before checking health
+	stopGraphBackend();
+	if (await isGraphBackendRunning()) {
+		console.log('[GraphBackend] Already running on port', port);
+		return;
+	}
+	try {
+		graphBackendProcess = spawn(pythonPath, ['-m', 'uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', String(port)], {
+			cwd: backendDir,
+			stdio: 'ignore',
+			detached: false,
+		});
+		graphBackendProcess.on('error', (err) => {
+			console.error('[GraphBackend] Failed to start:', err.message);
+			graphBackendProcess = null;
+		});
+		graphBackendProcess.on('exit', (code) => {
+			console.log(`[GraphBackend] Exited with code ${code}`);
+			graphBackendProcess = null;
+		});
+		console.log('[GraphBackend] Started (pid:', graphBackendProcess.pid, ')');
+	} catch (err: any) {
+		console.error('[GraphBackend] Error starting:', err.message);
+	}
+}
+
+function stopGraphBackend(): void {
+	if (graphBackendProcess) {
+		graphBackendProcess.kill();
+		graphBackendProcess = null;
+		console.log('[GraphBackend] Stopped');
+	}
+}
+
 export function activate(context: vscode.ExtensionContext) {
+	// Start graph backend in background
+	startGraphBackend();
 	const providers = [
 		new ClaudeChatProvider(context.extensionUri, context, 1),
 		new ClaudeChatProvider(context.extensionUri, context, 2),
@@ -80,7 +149,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(statusBar);
 }
 
-export function deactivate() { }
+export function deactivate() {
+	stopGraphBackend();
+}
 
 class ClaudeChatWebviewProvider implements vscode.WebviewViewProvider {
 	constructor(
@@ -501,10 +572,10 @@ class ClaudeChatProvider {
 	}
 
 	private async fetchLogicGraphContext(workspacePath: string): Promise<string | null> {
-		const url = `http://localhost:8000/api/graph/context?workspacePath=${encodeURIComponent(workspacePath)}&includeSummaries=true`;
-		const http = require('http');
+		const { port } = getGraphBackendConfig();
+		const url = `http://localhost:${port}/api/graph/context?workspacePath=${encodeURIComponent(workspacePath)}&includeSummaries=true`;
 		return new Promise((resolve) => {
-			const req = http.get(url, { timeout: 5000 }, (res: any) => {
+			const req = http.get(url, { timeout: 5000 }, (res) => {
 				if (res.statusCode !== 200) {
 					resolve(null);
 					return;

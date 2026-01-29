@@ -215,6 +215,21 @@
           "type": "boolean",
           "default": false,
           "description": "Enable Yolo Mode to skip all permission checks. Use with caution as Claude can execute any command without asking."
+        },
+        "claudeCodeChat.graphBackend.path": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the graph backend directory (contains app/main.py). Leave empty to disable auto-start."
+        },
+        "claudeCodeChat.graphBackend.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the Python executable for the graph backend. Defaults to .venv/bin/python inside the backend directory."
+        },
+        "claudeCodeChat.graphBackend.port": {
+          "type": "number",
+          "default": 8000,
+          "description": "Port for the graph backend server."
         }
       }
     }
