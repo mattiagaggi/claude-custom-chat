@@ -82,14 +82,14 @@ function renderFileAutocompleteList() {
 	// Render the list (limit to 10 items for performance)
 	const displayFiles = filteredAutocompleteFiles.slice(0, 10);
 	list.innerHTML = displayFiles.map((file, index) => `
-		<div class="file-autocomplete-item${index === fileAutocompleteIndex ? ' selected' : ''}"
+		<div class="file-autocomplete-item${index === fileAutocompleteIndex ? ' selected' : ''}${file.isSpecial ? ' special-context' : ''}"
 			 data-index="${index}"
 			 data-path="${escapeHtml(file.path)}"
 			 onclick="selectFileFromAutocomplete(${index})">
-			<div class="file-autocomplete-icon">${getFileIcon(file.name)}</div>
+			<div class="file-autocomplete-icon">${file.isSpecial ? file.icon : getFileIcon(file.name)}</div>
 			<div class="file-autocomplete-content">
 				<div class="file-autocomplete-name">${escapeHtml(file.name)}</div>
-				<div class="file-autocomplete-path">${escapeHtml(file.relativePath || file.path)}</div>
+				<div class="file-autocomplete-path">${escapeHtml(file.isSpecial ? file.description : (file.relativePath || file.path))}</div>
 			</div>
 		</div>
 	`).join('');
@@ -258,10 +258,36 @@ function checkFileAutocomplete() {
 }
 
 /**
+ * Special context items available via @ mentions
+ */
+const SPECIAL_CONTEXT_ITEMS = [
+	{
+		name: 'logic-graph',
+		path: 'logic-graph',
+		relativePath: 'logic-graph',
+		isSpecial: true,
+		icon: '🔗',
+		description: 'Inject codebase logic graph overview',
+	},
+];
+
+/**
  * Update the file list from backend response
  */
 function updateFileAutocompleteList(files) {
-	filteredAutocompleteFiles = files || [];
+	// Get the current filter from input
+	const input = messageInput;
+	const cursorPos = input.selectionStart;
+	const textBeforeCursor = input.value.substring(0, cursorPos);
+	const atMatch = textBeforeCursor.match(/@(\S*)$/);
+	const filter = atMatch ? atMatch[1].toLowerCase() : '';
+
+	// Prepend matching special items
+	const matchingSpecial = SPECIAL_CONTEXT_ITEMS.filter(item =>
+		!filter || item.name.toLowerCase().includes(filter)
+	);
+
+	filteredAutocompleteFiles = [...matchingSpecial, ...(files || [])];
 	if (fileAutocompleteVisible) {
 		renderFileAutocompleteList();
 	}

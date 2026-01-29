@@ -433,6 +433,18 @@ class ClaudeChatProvider {
 			message = `${config.get<string>('thinking.intensity', 'think').toUpperCase().replace('-', ' ')} THROUGH THIS STEP BY STEP: \n${message}`;
 		}
 
+		// Resolve @logic-graph context injection
+		if (message.includes('@logic-graph')) {
+			try {
+				const graphContext = await this.fetchLogicGraphContext(cwd);
+				message = message.replace(/@logic-graph/g, graphContext
+					? `\n<logic-graph>\n${graphContext}\n</logic-graph>\n`
+					: '\n[Logic graph not available — generate it first via the Graph tab]\n');
+			} catch {
+				message = message.replace(/@logic-graph/g, '\n[Logic graph not available — backend not running]\n');
+			}
+		}
+
 		// Dev Mode: Extension source is available via custom tool
 		// Claude can call the tool when it needs to see the extension code
 
@@ -486,6 +498,31 @@ class ClaudeChatProvider {
 			this.postMessage({ type: 'error', data: `Failed to start: ${e.message}`, conversationId: spawnedConversationId });
 			this.conversationHandler.sendActiveConversations();
 		}
+	}
+
+	private async fetchLogicGraphContext(workspacePath: string): Promise<string | null> {
+		const url = `http://localhost:8000/api/graph/context?workspacePath=${encodeURIComponent(workspacePath)}`;
+		const http = require('http');
+		return new Promise((resolve) => {
+			const req = http.get(url, { timeout: 5000 }, (res: any) => {
+				if (res.statusCode !== 200) {
+					resolve(null);
+					return;
+				}
+				let data = '';
+				res.on('data', (chunk: string) => { data += chunk; });
+				res.on('end', () => {
+					try {
+						const parsed = JSON.parse(data);
+						resolve(parsed.context || null);
+					} catch {
+						resolve(null);
+					}
+				});
+			});
+			req.on('error', () => resolve(null));
+			req.on('timeout', () => { req.destroy(); resolve(null); });
+		});
 	}
 
 	private handleProcessEnd(convId: string) {
