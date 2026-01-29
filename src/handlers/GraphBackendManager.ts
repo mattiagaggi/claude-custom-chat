@@ -113,16 +113,16 @@ export function buildContextFromCachedGraph(context: vscode.ExtensionContext): s
 		'## Nodes',
 	];
 	for (const node of saved.graph.nodes) {
-		const d = node.data;
-		if (!d) continue;
+		const d = node.data || node;
+		if (!d?.id) continue;
 		lines.push(`- **${d.id}** (${d.label}): ${d.description || ''}`);
 	}
 	if (saved.graph.edges?.length) {
 		lines.push('');
 		lines.push('## Edges');
 		for (const edge of saved.graph.edges) {
-			const e = edge.data;
-			if (!e) continue;
+			const e = edge.data || edge;
+			if (!e?.source) continue;
 			lines.push(`- ${e.source} → ${e.target}: ${e.label || ''}${e.description ? ' — ' + e.description : ''}`);
 		}
 	}

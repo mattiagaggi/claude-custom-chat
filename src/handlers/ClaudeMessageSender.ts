@@ -66,13 +66,15 @@ export class ClaudeMessageSender {
 		// Resolve @logic-graph context injection
 		if (message.includes('@logic-graph')) {
 			let graphContext: string | null = null;
-			try {
-				graphContext = await fetchLogicGraphContext(cwd);
-			} catch {
-				// Backend not reachable, will try cached data
-			}
+			// Try frontend cache first (always available if graph was generated)
+			graphContext = buildContextFromCachedGraph(this.deps.context);
+			// Fall back to backend if cache is empty
 			if (!graphContext) {
-				graphContext = buildContextFromCachedGraph(this.deps.context);
+				try {
+					graphContext = await fetchLogicGraphContext(cwd);
+				} catch {
+					// Backend not reachable
+				}
 			}
 			message = message.replace(/@logic-graph/g, graphContext
 				? `\n<logic-graph>\n${graphContext}\n</logic-graph>\n`
