@@ -51,9 +51,10 @@ function setupContainerDimensions(container) {
     const toolbarHeight = toolbar ? toolbar.offsetHeight : 35;
     const containerTop = graphContainer ? graphContainer.getBoundingClientRect().top : 80;
     const availableHeight = window.innerHeight - containerTop - toolbarHeight;
-    const availableWidth = graphContainer ? graphContainer.clientWidth : window.innerWidth;
 
-    container.style.width = Math.max(availableWidth, 200) + 'px';
+    // Don't set explicit width — let CSS absolute positioning (left:0; right:0)
+    // handle it, so the canvas matches the actual visible panel width.
+    container.style.width = '';
     container.style.height = Math.max(availableHeight, 200) + 'px';
 }
 
@@ -129,13 +130,13 @@ function initializeGraphWithData(graphData) {
     setTimeout(() => {
         if (cy) {
             cy.resize();
-            cy.fit();
+            cy.fit(null, 80);
         }
     }, 50);
     setTimeout(() => {
         if (cy) {
             cy.resize();
-            cy.fit();
+            cy.fit(null, 80);
         }
     }, 200);
 }
@@ -267,7 +268,7 @@ function switchMainTab(tabName) {
             setTimeout(() => {
                 if (cy) {
                     cy.resize();
-                    cy.fit();
+                    cy.fit(null, 80);
                 }
             }, 100);
         }

@@ -14,7 +14,7 @@ const layoutConfigs = {
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 50
+        padding: 80
     },
     default: {
         name: 'cose',
@@ -25,7 +25,7 @@ const layoutConfigs = {
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 30
+        padding: 80
     },
     bilkent: {
         name: 'cose-bilkent',
@@ -36,7 +36,7 @@ const layoutConfigs = {
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 30
+        padding: 80
     },
     antioverlap: {
         name: 'cose-bilkent',
@@ -47,21 +47,21 @@ const layoutConfigs = {
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 30
+        padding: 80
     },
     circular: {
         name: 'circle',
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 30
+        padding: 80
     },
     grid: {
         name: 'grid',
         animate: true,
         animationDuration: 500,
         fit: true,
-        padding: 30
+        padding: 80
     }
 };
 
