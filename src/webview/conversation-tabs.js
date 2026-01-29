@@ -132,8 +132,9 @@ function renderConversationTabs() {
 		return;
 	}
 
-	// Always show tab bar (Graph tab is always present)
-	tabsContainer.style.display = 'flex';
+	// Show tab bar only if there are conversation tabs or graph tab is open
+	const hasTabs = activeConversations.size > 0 || window._graphTabOpen;
+	tabsContainer.style.display = hasTabs ? 'flex' : 'none';
 
 	// Clear existing tabs
 	tabsList.innerHTML = '';
@@ -226,18 +227,36 @@ function renderConversationTabs() {
 		tabsList.appendChild(tab);
 	});
 
-	// Add Graph tab as a permanent tab
-	const graphTab = document.createElement('div');
-	graphTab.className = 'conversation-tab graph-tab';
-	if (window._graphTabActive) {
-		graphTab.classList.add('active');
+	// Add Graph tab only if it's open
+	if (window._graphTabOpen) {
+		const graphTab = document.createElement('div');
+		graphTab.className = 'conversation-tab graph-tab';
+		if (window._graphTabActive) {
+			graphTab.classList.add('active');
+		}
+		const graphTitle = document.createElement('span');
+		graphTitle.className = 'conversation-tab-title';
+		graphTitle.textContent = 'Graph';
+		graphTab.appendChild(graphTitle);
+
+		// Close button
+		const closeBtn = document.createElement('span');
+		closeBtn.className = 'conversation-tab-close';
+		closeBtn.innerHTML = '✕';
+		closeBtn.addEventListener('click', (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			window._graphTabOpen = false;
+			if (window._graphTabActive) {
+				hideGraph();
+			}
+			renderConversationTabs();
+		});
+		graphTab.appendChild(closeBtn);
+
+		graphTab.onclick = () => switchMainTab('graph');
+		tabsList.appendChild(graphTab);
 	}
-	const graphTitle = document.createElement('span');
-	graphTitle.className = 'conversation-tab-title';
-	graphTitle.textContent = 'Graph';
-	graphTab.appendChild(graphTitle);
-	graphTab.onclick = () => switchMainTab('graph');
-	tabsList.appendChild(graphTab);
 }
 
 /**

@@ -202,6 +202,14 @@ function hideGraph() {
 /**
  * Switch main content tabs between chat and graph
  */
+/**
+ * Open the graph tab (called from header button)
+ */
+function openGraphTab() {
+    window._graphTabOpen = true;
+    switchMainTab('graph');
+}
+
 function switchMainTab(tabName) {
     const chatContainer = document.getElementById('chatContainer');
     const graphContainer = document.getElementById('graphContainer');
@@ -209,6 +217,9 @@ function switchMainTab(tabName) {
     const statusBar = document.getElementById('status');
 
     window._graphTabActive = (tabName === 'graph');
+    if (tabName === 'graph') {
+        window._graphTabOpen = true;
+    }
     if (typeof renderConversationTabs === 'function') {
         renderConversationTabs();
     }

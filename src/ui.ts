@@ -32,6 +32,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		<div style="display: flex; gap: 8px; align-items: center;">
 			<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
+			<button class="btn outlined" id="graphBtn" onclick="openGraphTab()" title="Graph">📊</button>
 			<button class="btn outlined" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙️</button>
 			<button class="btn outlined" id="devModeBtn" onclick="toggleDevMode()" title="Dev Mode - Make this extension self-modifiable">🛠️</button>
 			<button class="btn outlined" id="pushToBranchBtn" onclick="showPushToBranchDialog()" title="Push changes to Git">🚀 Push</button>
