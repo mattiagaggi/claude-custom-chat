@@ -156,7 +156,14 @@ async function generateGraph() {
 
         if (result.stats) {
             console.log('Graph generation stats:', result.stats);
-            updateProgressLog('complete', `Done! ${result.stats.logic_nodes} nodes, ${result.stats.logic_edges} edges`, result.stats);
+            let completeMsg = `Done! ${result.stats.logic_nodes} nodes, ${result.stats.logic_edges} edges`;
+            if (result.stats.files_from_cache > 0 || result.stats.sub_nodes_from_cache > 0) {
+                const parts = [];
+                if (result.stats.files_from_cache > 0) parts.push(`${result.stats.files_from_cache} files`);
+                if (result.stats.sub_nodes_from_cache > 0) parts.push(`${result.stats.sub_nodes_from_cache} groups`);
+                completeMsg += ` (${parts.join(', ')} from cache)`;
+            }
+            updateProgressLog('complete', completeMsg, result.stats);
         }
 
         setTimeout(hideProgressPanel, 1500);

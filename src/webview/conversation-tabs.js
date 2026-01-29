@@ -227,30 +227,26 @@ function renderConversationTabs() {
 		tabsList.appendChild(tab);
 	});
 
-	// Add Graph tab only if it's open
+	// Add closeable Graph tab when open
 	if (window._graphTabOpen) {
 		const graphTab = document.createElement('div');
 		graphTab.className = 'conversation-tab graph-tab';
 		if (window._graphTabActive) {
 			graphTab.classList.add('active');
 		}
+
 		const graphTitle = document.createElement('span');
 		graphTitle.className = 'conversation-tab-title';
 		graphTitle.textContent = 'Graph';
 		graphTab.appendChild(graphTitle);
 
-		// Close button
 		const closeBtn = document.createElement('span');
 		closeBtn.className = 'conversation-tab-close';
 		closeBtn.innerHTML = '✕';
 		closeBtn.addEventListener('click', (e) => {
 			e.preventDefault();
 			e.stopPropagation();
-			window._graphTabOpen = false;
-			if (window._graphTabActive) {
-				hideGraph();
-			}
-			renderConversationTabs();
+			closeGraphTab();
 		});
 		graphTab.appendChild(closeBtn);
 

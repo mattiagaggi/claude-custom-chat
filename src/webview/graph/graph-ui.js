@@ -120,6 +120,9 @@ function updateProgressLog(step, message, data) {
     if (step === 'summarizing' && data?.current) {
         icon = `[${data.current}/${data.total}]`;
     }
+    if (step === 'building' && data?.cached) {
+        icon = '⚡';
+    }
 
     entry.textContent = `${icon} ${message}`;
     progressLogs.appendChild(entry);

@@ -282,6 +282,19 @@ class ClaudeChatProvider {
 					: null;
 				return this.postMessage({ type: 'workspacePath', path: workspacePath });
 			}
+			case 'saveGraphData': {
+				return this.context.workspaceState.update('claude.graphData', {
+					graph: message.graph,
+					expandedNodes: message.expandedNodes,
+					layout: message.layout,
+					view: message.view,
+					timestamp: Date.now(),
+				});
+			}
+			case 'loadGraphData': {
+				const saved = this.context.workspaceState.get<any>('claude.graphData');
+				return this.postMessage({ type: 'savedGraphData', data: saved || null });
+			}
 			case 'toggleDevMode': {
 				if (!this.devModeManager) {
 					vscode.window.showErrorMessage('Dev Mode Manager not initialized');

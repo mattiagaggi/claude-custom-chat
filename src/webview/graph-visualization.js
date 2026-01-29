@@ -203,13 +203,30 @@ function hideGraph() {
  * Switch main content tabs between chat and graph
  */
 /**
- * Open the graph tab (called from header button)
+ * Open the graph as a closeable tab and switch to it.
+ * Called from the header graph button.
  */
 function openGraphTab() {
     window._graphTabOpen = true;
     switchMainTab('graph');
 }
 
+/**
+ * Close the graph tab and return to chat view.
+ */
+function closeGraphTab() {
+    window._graphTabOpen = false;
+    if (window._graphTabActive) {
+        hideGraph();
+    }
+    if (typeof renderConversationTabs === 'function') {
+        renderConversationTabs();
+    }
+}
+
+/**
+ * Switch main content between chat and graph views.
+ */
 function switchMainTab(tabName) {
     const chatContainer = document.getElementById('chatContainer');
     const graphContainer = document.getElementById('graphContainer');
@@ -217,9 +234,6 @@ function switchMainTab(tabName) {
     const statusBar = document.getElementById('status');
 
     window._graphTabActive = (tabName === 'graph');
-    if (tabName === 'graph') {
-        window._graphTabOpen = true;
-    }
     if (typeof renderConversationTabs === 'function') {
         renderConversationTabs();
     }
@@ -330,6 +344,15 @@ function saveGraphState() {
         state.currentLayout = currentLayout;
         state.currentView = currentView;
         vscode.setState(state);
+
+        // Also persist to workspace state (survives VS Code restarts)
+        vscode.postMessage({
+            type: 'saveGraphData',
+            graph: currentGraphData,
+            expandedNodes: Array.from(expandedNodes),
+            layout: currentLayout,
+            view: currentView,
+        });
     }
 }
 
@@ -343,11 +366,39 @@ function restoreGraphState() {
             currentGraphData = state.graphData;
             currentLayout = state.currentLayout || 'auto';
             currentView = state.currentView || 'logic-graph';
-            console.log('Restored cached graph state');
+            console.log('Restored graph from webview state');
             return true;
         }
     }
     return false;
+}
+
+/**
+ * Restore graph from persistent workspace state (survives VS Code restarts).
+ * Sends a message to the extension and handles the response asynchronously.
+ */
+function requestGraphFromWorkspaceState() {
+    if (typeof vscode !== 'undefined') {
+        vscode.postMessage({ type: 'loadGraphData' });
+    }
+}
+
+/**
+ * Handle restored graph data from workspace state
+ */
+function handleSavedGraphData(data) {
+    if (!data || !data.graph || cy || currentGraphData || isGeneratingGraph) return;
+
+    currentGraphData = data.graph;
+    currentLayout = data.layout || 'auto';
+    currentView = data.view || 'logic-graph';
+    if (data.expandedNodes) {
+        expandedNodes = new Set(data.expandedNodes);
+    }
+
+    console.log('Restored graph from workspace state');
+    const cytoscapeData = convertLogicGraphToCytoscape(currentGraphData);
+    renderGraph(cytoscapeData);
 }
 
 // Make functions globally available
@@ -380,13 +431,23 @@ window.addEventListener('resize', () => {
 // Check backend connection on load
 setTimeout(checkBackendConnection, 1000);
 
+// Listen for graph data restored from workspace state
+window.addEventListener('message', event => {
+    if (event.data.type === 'savedGraphData') {
+        handleSavedGraphData(event.data.data);
+    }
+});
+
 // Restore cached graph on load if webview was previously disposed
 setTimeout(() => {
     if (!cy && !currentGraphData && !isGeneratingGraph) {
         if (restoreGraphState() && currentGraphData) {
-            console.log('Restoring graph from cache...');
+            console.log('Restoring graph from webview state...');
             const cytoscapeData = convertLogicGraphToCytoscape(currentGraphData);
             renderGraph(cytoscapeData);
+        } else {
+            // Fallback: request from persistent workspace state
+            requestGraphFromWorkspaceState();
         }
     }
 }, 500);
