@@ -103,35 +103,27 @@ export function fetchLogicGraphContext(workspacePath: string): Promise<string | 
 export function buildContextFromCachedGraph(context: vscode.ExtensionContext): string | null {
 	const saved = context.workspaceState.get<any>('claude.graphData');
 	if (!saved?.graph?.nodes?.length) return null;
-	const lines: string[] = [];
+	const lines: string[] = [
+		'# Codebase Logic Graph',
+		'',
+		'This is an AI-generated high-level map of the codebase\'s business logic structure.',
+		'Each node represents a logical component; edges show how they relate.',
+		'You can ask about a specific node by name to get more detail.',
+		'',
+		'## Nodes',
+	];
 	for (const node of saved.graph.nodes) {
 		const d = node.data;
 		if (!d) continue;
-		lines.push(`## ${d.label}`);
-		if (d.description) lines.push(d.description);
-		if (d.files?.length) lines.push(`Files: ${d.files.join(', ')}`);
-		if (d.subNodes?.length) {
-			for (const sub of d.subNodes) {
-				lines.push(`  - ${sub.label}${sub.description ? ': ' + sub.description : ''}`);
-				if (sub.files?.length) lines.push(`    Files: ${sub.files.join(', ')}`);
-			}
-		}
-		lines.push('');
-	}
-	const nodeMap = new Map<string, string>();
-	for (const node of saved.graph.nodes) {
-		if (node.data?.id && node.data?.label) {
-			nodeMap.set(node.data.id, node.data.label);
-		}
+		lines.push(`- **${d.id}** (${d.label}): ${d.description || ''}`);
 	}
 	if (saved.graph.edges?.length) {
-		lines.push('## Relationships');
+		lines.push('');
+		lines.push('## Edges');
 		for (const edge of saved.graph.edges) {
 			const e = edge.data;
 			if (!e) continue;
-			const src = nodeMap.get(e.source) || e.source;
-			const tgt = nodeMap.get(e.target) || e.target;
-			lines.push(`- ${src} → ${tgt}${e.label ? ' (' + e.label + ')' : ''}`);
+			lines.push(`- ${e.source} → ${e.target}: ${e.label || ''}${e.description ? ' — ' + e.description : ''}`);
 		}
 	}
 	return lines.join('\n');
