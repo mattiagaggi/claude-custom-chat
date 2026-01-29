@@ -15,3 +15,6 @@ export * from './VSCodeUtilities';
 export * from './ClaudeMessageHandler';
 export * from './IdleDetectionManager';
 export * from './CodeAnalyzer';
+export * from './GraphBackendManager';
+export * from './SlashCommandHandler';
+export * from './ClaudeMessageSender';
