@@ -218,7 +218,7 @@
         },
         "claudeCodeChat.graphBackend.path": {
           "type": "string",
-          "default": "",
+          "default": "/Users/Mattia/Code/vscode_graph_backend",
           "description": "Path to the graph backend directory (contains app/main.py). Leave empty to disable auto-start."
         },
         "claudeCodeChat.graphBackend.pythonPath": {
