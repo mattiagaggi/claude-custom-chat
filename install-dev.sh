@@ -8,13 +8,22 @@ echo "============================================================="
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
-# Check if VS Code is installed
-if ! command -v code &> /dev/null; then
-    echo "❌ Error: VS Code 'code' command not found in PATH"
-    echo "   Please install VS Code and ensure 'code' command is available"
+# Check for supported editor CLI commands
+EDITOR_CMD=""
+if command -v antigravity &> /dev/null; then
+    EDITOR_CMD="antigravity"
+elif command -v cursor &> /dev/null; then
+    EDITOR_CMD="cursor"
+elif command -v code &> /dev/null; then
+    EDITOR_CMD="code"
+else
+    echo "❌ Error: No supported editor CLI command found in PATH"
+    echo "   Supported editors: Antigravity, Cursor, VS Code"
+    echo "   Please install the shell command for your editor:"
     echo "   Run: View > Command Palette > Shell Command: Install 'code' command in PATH"
     exit 1
 fi
+echo "🔧 Using editor command: $EDITOR_CMD"
 
 # Install dependencies
 echo "📦 Installing dependencies..."
@@ -33,7 +42,7 @@ echo "📋 Extension ID: $EXTENSION_ID"
 
 # Uninstall existing version if present
 echo "🗑️  Removing existing version (if any)..."
-code --uninstall-extension "$EXTENSION_ID" 2>/dev/null || true
+$EDITOR_CMD --uninstall-extension "$EXTENSION_ID" 2>/dev/null || true
 
 # Find extensions directory (supports VS Code, Cursor, and other forks)
 VSCODE_EXT_DIR=""
