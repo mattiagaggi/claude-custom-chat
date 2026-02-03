@@ -125,10 +125,13 @@ export class ClaudeMessageSender {
 				parent_tool_use_id: null
 			}) + '\n');
 
-			proc.stdout?.on('data', (d: Buffer) => this.deps.streamParser.parseChunk(d.toString(), spawnedConversationId));
-			proc.stderr?.on('data', (d: Buffer) => { const e = d.toString(); if (e.trim()) this.deps.postMessage({ type: 'error', data: `[CLI Error] ${e}`, conversationId: spawnedConversationId }); });
-			proc.on('close', () => this.handleProcessEnd(spawnedConversationId));
-			proc.on('error', (e: Error) => this.handleProcessError(spawnedConversationId, e));
+			proc.stdout?.on('data', (d: Buffer) => {
+				console.log('[Extension] stdout received:', d.toString().substring(0, 200));
+				this.deps.streamParser.parseChunk(d.toString(), spawnedConversationId);
+			});
+			proc.stderr?.on('data', (d: Buffer) => { const e = d.toString(); console.log('[Extension] stderr received:', e); if (e.trim()) this.deps.postMessage({ type: 'error', data: `[CLI Error] ${e}`, conversationId: spawnedConversationId }); });
+			proc.on('close', (code) => { console.log('[Extension] Process closed with code:', code); this.handleProcessEnd(spawnedConversationId); });
+			proc.on('error', (e: Error) => { console.log('[Extension] Process error:', e); this.handleProcessError(spawnedConversationId, e); });
 		} catch (e: any) {
 			processingIds.delete(spawnedConversationId);
 			this.deps.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });

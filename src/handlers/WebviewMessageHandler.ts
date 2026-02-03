@@ -243,27 +243,9 @@ export class WebviewMessageHandler {
 				// These messages are handled directly in extension.ts or can be safely ignored
 				break;
 
-			case 'getWorkspacePath':
-				// Return workspace path for graph generation
-				this.handleGetWorkspacePath();
-				break;
-
 			default:
 				console.log('Unknown message type:', message.type);
 		}
-	}
-
-	/**
-	 * Handle workspace path request for graph generation
-	 */
-	private handleGetWorkspacePath(): void {
-		const workspaceFolders = vscode.workspace.workspaceFolders;
-		const workspacePath = workspaceFolders && workspaceFolders.length > 0
-			? workspaceFolders[0].uri.fsPath
-			: null;
-
-		// Note: This requires access to webview - the extension.ts will handle posting the message
-		// This is just a placeholder - the actual implementation is in extension.ts
 	}
 
 	/**
@@ -293,19 +275,8 @@ export class WebviewMessageHandler {
 	 */
 	public async openFile(filePath: string): Promise<void> {
 		try {
-			let uri: vscode.Uri;
-			if (filePath.startsWith('/') || /^[a-zA-Z]:/.test(filePath)) {
-				uri = vscode.Uri.file(filePath);
-			} else {
-				// Resolve relative path against workspace
-				const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-				if (workspaceFolder) {
-					uri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
-				} else {
-					uri = vscode.Uri.file(filePath);
-				}
-			}
-			await vscode.window.showTextDocument(uri, { viewColumn: vscode.ViewColumn.One, preserveFocus: false });
+			const uri = vscode.Uri.file(filePath);
+			await vscode.window.showTextDocument(uri);
 		} catch (error: any) {
 			vscode.window.showErrorMessage(`Failed to open file: ${error.message}`);
 		}

@@ -287,6 +287,7 @@ class ClaudeChatProvider {
 	}
 
 	private async handleWebviewMessage(message: any) {
+		console.log('[Extension] Received message:', message.type, message);
 		switch (message.type) {
 			case 'ready': return this.reinitialize();
 			case 'getConversationList': return this.sendConversationList();
