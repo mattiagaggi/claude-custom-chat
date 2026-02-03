@@ -1,0 +1,305 @@
+/**
+ * Graph Visualization Styles
+ * Matches the reference vscode_graph_extension implementation
+ */
+
+/* Graph Container */
+.graph-container {
+    width: 100%;
+    flex: 1;
+    min-height: 0;
+    background: var(--vscode-editor-background);
+    position: relative;
+    overflow: hidden;
+    display: none;
+    flex-direction: column;
+}
+
+.graph-canvas {
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+}
+
+/* Graph toolbar below tabs */
+.graph-toolbar {
+    display: flex;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 6px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--vscode-editor-background);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 10;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.graph-toolbar .btn {
+    display: inline-flex !important;
+    padding: 3px 8px !important;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    font-family: var(--vscode-font-family);
+    border: 1px solid transparent;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.graph-toolbar .btn.primary {
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border-color: var(--vscode-button-background);
+}
+
+.graph-toolbar .btn.primary:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.graph-toolbar .btn.primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.graph-toolbar .btn.outlined {
+    background-color: transparent;
+    color: var(--vscode-foreground);
+    border-color: var(--vscode-panel-border);
+}
+
+.graph-toolbar .btn.outlined:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+.graph-info-inline {
+    margin-left: auto;
+    font-size: 10px;
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    flex-shrink: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.graph-style-select {
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    font-size: 11px;
+    font-weight: 500;
+    font-family: var(--vscode-font-family);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.graph-style-select:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+/* Graph Canvas - absolute fill for Cytoscape */
+#graphCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--vscode-editor-background);
+    z-index: 0;
+}
+
+/* Wrapper: takes remaining space, provides positioning context for canvas */
+.graph-canvas-wrapper {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: hidden;
+}
+
+
+/* Repository Title - Top Center */
+.repository-title {
+    position: absolute;
+    top: 100px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    background-color: rgba(var(--vscode-editor-background-rgb, 30, 30, 30), 0.95);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 8px;
+    padding: 16px 24px;
+    max-width: 600px;
+    text-align: center;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    animation: fadeInDown 0.5s ease-out;
+}
+
+.repository-title h2 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.repository-title p {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.5;
+}
+
+.repository-title .features {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 12px;
+}
+
+.repository-title .feature-tag {
+    background-color: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.repository-title .tech-stack {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -20px);
+    }
+    to {
+        opacity: 1;
+        transform: translate(-50%, 0);
+    }
+}
+
+/* Tooltip */
+.graph-tooltip {
+    position: absolute;
+    background-color: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    padding: 6px;
+    border-radius: 3px;
+    font-size: 12px;
+    z-index: 1000;
+    pointer-events: none;
+    display: none;
+    border: 1px solid var(--vscode-panel-border);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+/* Pulse animations for changed nodes */
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.7);
+    }
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(244, 67, 54, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(244, 67, 54, 0);
+    }
+}
+
+@keyframes pulse-gold {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.7);
+    }
+    70% {
+        transform: scale(1.05);
+        box-shadow: 0 0 0 10px rgba(255, 215, 0, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    }
+}
+
+/* Animation for tab switching */
+.graph-container,
+.chat-container {
+    animation: fadeIn 0.2s ease-in;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* High contrast mode adjustments */
+.vscode-high-contrast .graph-container {
+    border: 1px solid var(--vscode-contrastBorder);
+}
+
+.vscode-high-contrast .view-switcher,
+.vscode-high-contrast .layout-switcher,
+.vscode-high-contrast .graph-info {
+    border-width: 2px;
+}
+
+/* Backend Status Indicator */
+.backend-status {
+    font-size: 10px;
+    padding: 2px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.backend-status:hover {
+    background-color: var(--vscode-list-hoverBackground);
+}
+
+/* Progress Panel */
+#progressPanel {
+    font-family: var(--vscode-font-family);
+}
+
+#progressPanel::-webkit-scrollbar {
+    width: 6px;
+}
+
+#progressPanel::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#progressPanel::-webkit-scrollbar-thumb {
+    background: var(--vscode-scrollbarSlider-background);
+    border-radius: 3px;
+}
+
+#progressPanel::-webkit-scrollbar-thumb:hover {
+    background: var(--vscode-scrollbarSlider-hoverBackground);
+}

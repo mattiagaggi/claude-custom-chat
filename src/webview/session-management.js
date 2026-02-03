@@ -9,7 +9,7 @@
 
 function newSession() {
 	sendStats('New chat');
-
+	hideGraph();
 	vscode.postMessage({
 		type: 'newSession'
 	});
@@ -95,6 +95,7 @@ function toggleConversationHistory() {
 	const historyDiv = document.getElementById('conversationHistory');
 	const chatContainer = document.getElementById('chatContainer');
 
+	hideGraph();
 	if (historyDiv.style.display === 'none' || historyDiv.style.display === '') {
 		historyDiv.style.display = 'block';
 		chatContainer.style.display = 'none';
@@ -108,6 +109,7 @@ function toggleConversationHistory() {
 function closeConversationHistory() {
 	const historyDiv = document.getElementById('conversationHistory');
 	const chatContainer = document.getElementById('chatContainer');
+	hideGraph();
 	historyDiv.style.display = 'none';
 	chatContainer.style.display = 'flex';
 }

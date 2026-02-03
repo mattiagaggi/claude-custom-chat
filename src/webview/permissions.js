@@ -116,7 +116,7 @@ function addPermissionRequestMessage(data) {
 
 function updatePermissionStatus(id, status) {
 	const permissionMsg = document.getElementById(`permission-${id}`);
-	if (!permissionMsg) return;
+	if (!permissionMsg) { return; }
 
 	permissionMsg.dataset.status = status;
 	const permissionContent = permissionMsg.querySelector('.permission-content');
@@ -124,12 +124,12 @@ function updatePermissionStatus(id, status) {
 	const menuDiv = permissionMsg.querySelector('.permission-menu');
 
 	// Hide buttons and menu if present
-	if (buttons) buttons.style.display = 'none';
-	if (menuDiv) menuDiv.style.display = 'none';
+	if (buttons) { buttons.style.display = 'none'; }
+	if (menuDiv) { menuDiv.style.display = 'none'; }
 
 	// Remove existing decision div if any
 	const existingDecision = permissionContent.querySelector('.permission-decision');
-	if (existingDecision) existingDecision.remove();
+	if (existingDecision) { existingDecision.remove(); }
 
 	// Add new decision div
 	const decisionDiv = document.createElement('div');
@@ -313,7 +313,7 @@ function submitQuestionAnswers(questionId, questionCount) {
 		questionDiv.style.opacity = '0.5';
 		questionDiv.style.pointerEvents = 'none';
 		const buttons = questionDiv.querySelector('.question-buttons');
-		if (buttons) buttons.style.display = 'none';
+		if (buttons) { buttons.style.display = 'none'; }
 	}
 }
 

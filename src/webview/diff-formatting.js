@@ -15,11 +15,11 @@ function formatToolInputUI(input) {
 			const inputId = 'input_' + Math.random().toString(36).substr(2, 9);
 
 			return '<span id="' + inputId + '_visible">' + escapeHtml(truncated) + '</span>' +
-				   '<span id="' + inputId + '_ellipsis">...</span>' +
-				   '<span id="' + inputId + '_hidden" style="display: none;">' + escapeHtml(str.substring(truncateAt)) + '</span>' +
-				   '<div class="diff-expand-container">' +
-				   '<button class="diff-expand-btn" onclick="toggleResultExpansion(\'' + inputId + '\')">Show more</button>' +
-				   '</div>';
+				'<span id="' + inputId + '_ellipsis">...</span>' +
+				'<span id="' + inputId + '_hidden" style="display: none;">' + escapeHtml(str.substring(truncateAt)) + '</span>' +
+				'<div class="diff-expand-container">' +
+				'<button class="diff-expand-btn" onclick="toggleResultExpansion(\'' + inputId + '\')">Show more</button>' +
+				'</div>';
 		}
 		return str;
 	}
@@ -35,7 +35,7 @@ function formatToolInputUI(input) {
 	for (const [key, value] of Object.entries(input)) {
 		const valueStr = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
 
-		if (!isFirst) result += '\n';
+		if (!isFirst) { result += '\n'; }
 		isFirst = false;
 
 		// Special formatting for file_path in Read tool context
@@ -75,14 +75,14 @@ function computeLineDiff(oldLines, newLines) {
 
 	while (i > 0 || j > 0) {
 		if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
-			diff.unshift({type: 'context', oldLine: i - 1, newLine: j - 1, content: oldLines[i - 1]});
+			diff.unshift({ type: 'context', oldLine: i - 1, newLine: j - 1, content: oldLines[i - 1] });
 			i--;
 			j--;
 		} else if (j > 0 && (i === 0 || lcs[i][j - 1] >= lcs[i - 1][j])) {
-			diff.unshift({type: 'added', newLine: j - 1, content: newLines[j - 1]});
+			diff.unshift({ type: 'added', newLine: j - 1, content: newLines[j - 1] });
 			j--;
 		} else if (i > 0) {
-			diff.unshift({type: 'removed', oldLine: i - 1, content: oldLines[i - 1]});
+			diff.unshift({ type: 'removed', oldLine: i - 1, content: oldLines[i - 1] });
 			i--;
 		}
 	}
@@ -92,7 +92,7 @@ function computeLineDiff(oldLines, newLines) {
 
 function parseToolResult(resultContent) {
 	if (!resultContent || typeof resultContent !== 'string') {
-		return {startLine: 1, lines: []};
+		return { startLine: 1, lines: [] };
 	}
 
 	const lines = resultContent.split('\n');
@@ -104,12 +104,12 @@ function parseToolResult(resultContent) {
 		if (match) {
 			const lineNum = parseInt(match[1]);
 			const content = match[2];
-			if (startLine === null) startLine = lineNum;
-			parsed.push({num: lineNum, content});
+			if (startLine === null) { startLine = lineNum; }
+			parsed.push({ num: lineNum, content });
 		}
 	}
 
-	return {startLine: startLine || 1, lines: parsed};
+	return { startLine: startLine || 1, lines: parsed };
 }
 
 function generateUnifiedDiffHTML(oldString, newString, filePath, startLine = 1, showButton = false) {
@@ -136,8 +136,8 @@ function generateUnifiedDiffHTML(oldString, newString, filePath, startLine = 1, 
 
 	// Calculate actual line numbers
 	for (const change of diff) {
-		if (change.type === 'added') addedCount++;
-		if (change.type === 'removed') removedCount++;
+		if (change.type === 'added') { addedCount++; }
+		if (change.type === 'removed') { removedCount++; }
 	}
 
 	lastLine = startLine + newLines.length - 1;

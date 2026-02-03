@@ -1,3 +1,4 @@
+    .tools-btn {
         border: none;
         padding: 3px 7px;
         border-radius: 4px;
@@ -351,4 +352,3 @@
         max-height: 400px;
         overflow-y: auto;
     }
-

@@ -7,16 +7,23 @@
  */
 
 import getScript from './script';
-import styles from './ui-styles'
+import styles from './ui-styles';
 
 
-const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string) => `<!DOCTYPE html>
+const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: string, cytoscapeUri?: string, layoutBaseUri?: string, coseBaseUri?: string, coseBilkentUri?: string, dagreUri?: string, cytoscapeDagreUri?: string, cspSource?: string) => `<!DOCTYPE html>
 <html lang="en">
 <head>
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	${cspSource ? `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${cspSource} https: data:; script-src ${cspSource} 'unsafe-inline'; style-src ${cspSource} 'unsafe-inline'; font-src ${cspSource}; connect-src ${cspSource} http://localhost:8000 http://127.0.0.1:8000;">` : ''}
 	<title>Claude Custom Chat</title>
 	${styleUri ? styles(styleUri) : '<!-- No CSS URI provided -->'}
+	${cytoscapeUri ? `<script src="${cytoscapeUri}"></script>` : ''}
+	${layoutBaseUri ? `<script src="${layoutBaseUri}"></script>` : ''}
+	${coseBaseUri ? `<script src="${coseBaseUri}"></script>` : ''}
+	${coseBilkentUri ? `<script src="${coseBilkentUri}"></script>` : ''}
+	${dagreUri ? `<script src="${dagreUri}"></script>` : ''}
+	${cytoscapeDagreUri ? `<script src="${cytoscapeDagreUri}"></script>` : ''}
 </head>
 <body data-telemetry-enabled="${isTelemetryEnabled}">
 	<div class="header">
@@ -25,6 +32,7 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 		<div style="display: flex; gap: 8px; align-items: center;">
 			<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
+			<button class="btn outlined" id="graphBtn" onclick="openGraphTab()" title="Graph">📊</button>
 			<button class="btn outlined" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙️</button>
 			<button class="btn outlined" id="devModeBtn" onclick="toggleDevMode()" title="Dev Mode - Make this extension self-modifiable">🛠️</button>
 			<button class="btn outlined" id="pushToBranchBtn" onclick="showPushToBranchDialog()" title="Push changes to Git">🚀 Push</button>
@@ -43,14 +51,14 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		</div>
 	</div>
 
-	<!-- Active Conversations Tabs -->
-	<div id="activeConversationTabs" class="active-conversation-tabs" style="display: none;">
+	<!-- Conversation Tabs (includes Graph tab) -->
+	<div id="activeConversationTabs" class="active-conversation-tabs" style="display: flex;">
 		<div id="conversationTabsList" class="conversation-tabs-list">
 			<!-- Active conversation tabs will be rendered here -->
 		</div>
 	</div>
 
-	<div class="chat-container" id="chatContainer">
+	<div class="chat-container" id="chatContainer" style="display: flex;">
 		<div class="messages" id="messages"></div>
 		
 		<!-- WSL Alert for Windows users -->
@@ -150,7 +158,30 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 			</div>
 		</div>
 	</div>
-	
+
+	<!-- Graph Container -->
+	<div class="graph-container" id="graphContainer" style="display: none;">
+		<!-- Graph Toolbar -->
+		<div class="graph-toolbar" id="graphTabControls">
+			<div id="backendStatus" class="backend-status" onclick="showBackendInstructions()" title="Backend connection status">
+				●
+			</div>
+			<button class="btn primary" id="generateGraphBtn" onclick="generateGraph()">Gen</button>
+			<button class="btn primary" onclick="refreshModifiedFiles()">Ref</button>
+			<select class="graph-style-select" id="graphStyleSelect" onchange="changeLayout(this.value)">
+				<option value="auto" selected>Auto</option>
+				<option value="bilkent">Bilkent</option>
+				<option value="antioverlap">Anti-Overlap</option>
+			</select>
+			<span class="graph-info-inline" id="graphInfoInline"></span>
+		</div>
+
+		<!-- Graph Canvas -->
+		<div class="graph-canvas-wrapper">
+			<div id="graphCanvas"></div>
+		</div>
+	</div>
+
 	<div class="status ready" id="status">
 		<div class="status-indicator"></div>
 		<div class="status-text" id="statusText">Initializing...</div>
@@ -856,6 +887,14 @@ const getHtml = (isTelemetryEnabled: boolean, styleUri?: string, scriptUri?: str
 		<script src="${scriptUri.replace('script.js', 'modals.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'git-push.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'slash-autocomplete.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-config.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-data.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-styles.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-ui.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-nodes.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-events.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph/graph-api.js')}"></script>
+		<script src="${scriptUri.replace('script.js', 'graph-visualization.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'message-handler.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'event-listeners.js')}"></script>
 		<script src="${scriptUri.replace('script.js', 'init.js')}"></script>

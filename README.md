@@ -85,6 +85,10 @@ The installation script will:
 
 **Restore Checkpoints** - Instantly undo changes and restore to any previous state. Automatic Git-based backup system for safe experimentation. Browse and restore from any conversation checkpoint with real-time cost and token tracking.
 
+## Graph Visualization
+
+Open the graph view using the 📊 button in the header. The graph tab appears as a closeable tab in the tab bar, just like conversation tabs. It connects to an external backend to visualize codebase relationships using Cytoscape.js.
+
 ---
 
 ## Dev Mode Guide
@@ -277,8 +281,13 @@ claude-custom-chat/
 │   └── webview/                  # Frontend (JavaScript/CSS)
 │       ├── message-handler.js    # Message routing
 │       ├── message-rendering.js  # Chat rendering
+│       ├── conversation-tabs.js  # Multi-conversation tab management
 │       ├── permissions.js        # Permission dialogs
 │       ├── git-push.js           # Git push UI
+│       ├── graph/                # Graph visualization modules
+│       │   ├── graph-api.js      # Graph backend API communication
+│       │   └── graph-ui.js       # Graph UI rendering helpers
+│       ├── graph-visualization.js # Graph tab and Cytoscape integration
 │       └── styles.css            # All styles
 ├── test/                         # Test files
 ├── install-dev.sh                # Installation script

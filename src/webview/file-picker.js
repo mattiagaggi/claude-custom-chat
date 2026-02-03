@@ -19,6 +19,9 @@ function showFilePicker() {
 	selectedFileIndex = -1;
 }
 
+
+
+
 function hideFilePicker() {
 	filePickerModal.style.display = 'none';
 	fileSearchInput.value = '';

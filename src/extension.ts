@@ -27,28 +27,30 @@ import {
 	getSettings as utilGetSettings,
 	updateSettings as utilUpdateSettings,
 	enableYoloMode as utilEnableYoloMode,
-	getPlatformInfo
+	getPlatformInfo,
+	startGraphBackend,
+	stopGraphBackend,
+	SlashCommandHandler,
+	ClaudeMessageSender
 } from './handlers';
 
 export function activate(context: vscode.ExtensionContext) {
+	startGraphBackend();
 	const providers = [
 		new ClaudeChatProvider(context.extensionUri, context, 1),
 		new ClaudeChatProvider(context.extensionUri, context, 2),
 		new ClaudeChatProvider(context.extensionUri, context, 3)
 	];
 
-	// Initialize Dev Mode Manager
 	const devModeManager = new DevModeManager(context.extensionUri.fsPath);
 	context.subscriptions.push(devModeManager);
 
-	// Set up reload callback to save conversation state before reload
 	devModeManager.setReloadCallback(async () => {
 		for (const provider of providers) {
 			await provider.saveConversationState();
 		}
 	});
 
-	// Share DevModeManager with all providers
 	providers.forEach(p => p.setDevModeManager(devModeManager));
 
 	context.subscriptions.push(
@@ -80,7 +82,9 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(statusBar);
 }
 
-export function deactivate() { }
+export function deactivate() {
+	stopGraphBackend();
+}
 
 class ClaudeChatWebviewProvider implements vscode.WebviewViewProvider {
 	constructor(
@@ -90,11 +94,7 @@ class ClaudeChatWebviewProvider implements vscode.WebviewViewProvider {
 	) { }
 
 	resolveWebviewView(webviewView: vscode.WebviewView) {
-		// Instead of showing content in the sidebar, open the panel
-		// This makes the sidebar icon behave the same as the status bar icon
 		this.chatProvider.show(vscode.ViewColumn.Two);
-
-		// Set minimal HTML to avoid showing any content in sidebar
 		webviewView.webview.options = { enableScripts: true, localResourceRoots: [this.extensionUri] };
 		webviewView.webview.html = `<!DOCTYPE html><html><body></body></html>`;
 	}
@@ -116,6 +116,8 @@ class ClaudeChatProvider {
 	private conversationHandler: ConversationHandler;
 	private permissionRequestHandler: PermissionRequestHandler;
 	private idleDetectionManager: IdleDetectionManager;
+	private slashCommandHandler: SlashCommandHandler;
+	private messageSender: ClaudeMessageSender;
 
 	private selectedModel = 'default';
 	private chatNumber: number;
@@ -179,6 +181,32 @@ class ClaudeChatProvider {
 		this.idleDetectionManager = new IdleDetectionManager({
 			postMessage: (msg) => this.postMessage(msg),
 			isProcessing: () => this.processingConversationIds.size > 0
+		});
+
+		this.messageSender = new ClaudeMessageSender({
+			processManager: this.processManager,
+			conversationManager: this.conversationManager,
+			mcpHandler: this.mcpHandler,
+			streamParser: this.streamParser,
+			conversationHandler: this.conversationHandler,
+			idleDetectionManager: this.idleDetectionManager,
+			context: this.context,
+			postMessage: (msg) => this.postMessage(msg),
+			getCurrentConversationId: () => this.currentConversationId,
+			getProcessingConversationIds: () => this.processingConversationIds,
+			getConversationStreamingText: () => this.conversationStreamingText,
+			getSelectedModel: () => this.selectedModel,
+			stopConversationProcess: (id) => this.stopConversationProcess(id),
+			sendConversationList: () => this.sendConversationList(),
+		});
+
+		this.slashCommandHandler = new SlashCommandHandler({
+			postMessage: (msg) => this.postMessage(msg),
+			newSession: () => this.newSession(),
+			sendCurrentUsage: () => this.sendCurrentUsage(),
+			addMessage: (type, data, convId) => this.conversationManager.addMessage(type, data, convId),
+			getCurrentConversationId: () => this.currentConversationId,
+			sendRegularMessage: (msg) => this.messageSender.sendMessage(msg),
 		});
 
 		this.selectedModel = context.workspaceState.get('claude.selectedModel', 'default');
@@ -259,6 +287,7 @@ class ClaudeChatProvider {
 	}
 
 	private async handleWebviewMessage(message: any) {
+		console.log('[Extension] Received message:', message.type, message);
 		switch (message.type) {
 			case 'ready': return this.reinitialize();
 			case 'getConversationList': return this.sendConversationList();
@@ -275,6 +304,26 @@ class ClaudeChatProvider {
 			case 'selectImageFile': { const p = await utilSelectImageFile(); if (p) this.postMessage({ type: 'imagePath', path: p }); return; }
 			case 'copyToClipboard': return vscode.env.clipboard.writeText(message.text);
 			case 'requestNextSuggestion': return this.idleDetectionManager.showNextSuggestion();
+			case 'getWorkspacePath': {
+				const workspaceFolders = vscode.workspace.workspaceFolders;
+				const workspacePath = workspaceFolders && workspaceFolders.length > 0
+					? workspaceFolders[0].uri.fsPath
+					: null;
+				return this.postMessage({ type: 'workspacePath', path: workspacePath });
+			}
+			case 'saveGraphData': {
+				return this.context.workspaceState.update('claude.graphData', {
+					graph: message.graph,
+					expandedNodes: message.expandedNodes,
+					layout: message.layout,
+					view: message.view,
+					timestamp: Date.now(),
+				});
+			}
+			case 'loadGraphData': {
+				const saved = this.context.workspaceState.get<any>('claude.graphData');
+				return this.postMessage({ type: 'savedGraphData', data: saved || null });
+			}
 			case 'toggleDevMode': {
 				if (!this.devModeManager) {
 					vscode.window.showErrorMessage('Dev Mode Manager not initialized');
@@ -310,7 +359,7 @@ class ClaudeChatProvider {
 			onOpenModelTerminal: () => openTerminal('Claude Model', 'claude --help'),
 			onOpenUsageTerminal: (t: string) => openTerminal('Claude Usage', `claude usage ${t}`),
 			onRunInstallCommand: () => openTerminal('Install Claude', 'npm install -g @anthropic/claude'),
-			onExecuteSlashCommand: (c: string) => this.executeSlashCommand(c),
+			onExecuteSlashCommand: (c: string) => this.slashCommandHandler.execute(c),
 			onOpenDiff: utilOpenDiff,
 			onOpenFile: utilOpenFile,
 			onRunFileInTerminal: utilRunFileInTerminal,
@@ -353,20 +402,14 @@ class ClaudeChatProvider {
 				}
 			},
 			onPushToBranch: async (branchName: string, commitMessage: string) => {
-				if (this.devModeManager && this.devModeManager.isActive()) {
-					await this.devModeManager.pushToBranch(branchName, commitMessage, false);
-				} else if (this.devModeManager) {
-					// Allow push even without Dev Mode active
+				if (this.devModeManager) {
 					await this.devModeManager.pushToBranch(branchName, commitMessage, false);
 				} else {
 					vscode.window.showWarningMessage('Git functionality not available');
 				}
 			},
 			onPushToNewBranch: async (branchName: string, commitMessage: string) => {
-				if (this.devModeManager && this.devModeManager.isActive()) {
-					await this.devModeManager.pushToNewBranch(branchName, commitMessage);
-				} else if (this.devModeManager) {
-					// Allow push even without Dev Mode active
+				if (this.devModeManager) {
 					await this.devModeManager.pushToNewBranch(branchName, commitMessage);
 				} else {
 					vscode.window.showWarningMessage('Git functionality not available');
@@ -376,121 +419,23 @@ class ClaudeChatProvider {
 	}
 
 	private async sendMessageToClaude(message: string, _planMode?: boolean, thinkingMode?: boolean, skipUIDisplay?: boolean) {
-		// Detect slash commands typed in chat (e.g., "/help", "/doctor")
+		console.log('[Extension] sendMessageToClaude called:', { message: message.substring(0, 50), _planMode, thinkingMode, skipUIDisplay });
+
+		// Detect slash commands typed in chat
 		const slashMatch = message.match(/^\/(\S+)(?:\s|$)/);
 		if (slashMatch) {
 			const command = slashMatch[1];
-			// Show the command in chat
 			if (!skipUIDisplay) {
 				this.postMessage({ type: 'userInput', data: message });
 				this.conversationManager.addMessage('userInput', message, this.currentConversationId);
 			}
-			await this.executeSlashCommand(command);
+			await this.slashCommandHandler.execute(command);
 			return;
 		}
 
-		if (this.currentConversationId && this.processingConversationIds.has(this.currentConversationId)) {
-			await this.stopConversationProcess(this.currentConversationId);
-			this.postMessage({ type: 'assistantMessage', data: '⚠️ _Previous operation cancelled - starting new request..._' });
-			this.conversationManager.addMessage('assistantMessage', '⚠️ _Previous operation cancelled - starting new request..._', this.currentConversationId);
-		}
-
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-		const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
-
-		const args = ['--print', '--output-format', 'stream-json', '--input-format', 'stream-json', '--verbose', '--include-partial-messages'];
-		if (config.get<boolean>('permissions.yoloMode', false)) {
-			args.push('--dangerously-skip-permissions');
-		} else {
-			args.push('--permission-prompt-tool', 'stdio');
-		}
-		const mcpPath = this.mcpHandler.getConfigPath();
-		if (mcpPath) {
-			args.push('--mcp-config', mcpPath);
-		}
-		if (thinkingMode) {
-			message = `${config.get<string>('thinking.intensity', 'think').toUpperCase().replace('-', ' ')} THROUGH THIS STEP BY STEP: \n${message}`;
-		}
-
-		// Dev Mode: Extension source is available via custom tool
-		// Claude can call the tool when it needs to see the extension code
-
-		if (this.selectedModel && this.selectedModel !== 'default') {
-			args.push('--model', this.selectedModel);
-		}
-
-		const conversation = this.currentConversationId ? this.conversationManager.getConversation(this.currentConversationId) : null;
-		const sessionId = conversation?.sessionId;
-		if (sessionId) {
-			args.push('--resume', sessionId);
-		}
-
-		const spawnedConversationId = this.currentConversationId;
-		if (!spawnedConversationId) { this.postMessage({ type: 'error', data: 'No active conversation' }); return; }
-
-		this.processingConversationIds.add(spawnedConversationId);
-		if (!skipUIDisplay) { this.postMessage({ type: 'userInput', data: message }); this.conversationManager.addMessage('userInput', message, spawnedConversationId); }
-		else this.conversationManager.addMessage('userInput', message, spawnedConversationId);
-
-		await this.conversationManager.saveConversation(spawnedConversationId);
-		this.sendConversationList();
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: true }, conversationId: spawnedConversationId });
-		this.postMessage({ type: 'loading', data: 'Claude is working...', conversationId: spawnedConversationId });
-		this.conversationHandler.sendActiveConversations();
-		this.idleDetectionManager.start();
-
-		try {
-			const proc = await this.processManager.spawnForConversation({
-				args, cwd,
-				wslEnabled: config.get('wsl.enabled', false),
-				wslDistro: config.get('wsl.distro', 'Ubuntu'),
-				nodePath: config.get('wsl.nodePath', '/usr/bin/node'),
-				claudePath: config.get('wsl.claudePath', '/usr/local/bin/claude')
-			}, spawnedConversationId);
-
-			this.processManager.writeToConversation(spawnedConversationId, JSON.stringify({
-				type: 'user', session_id: sessionId || '',
-				message: { role: 'user', content: [{ type: 'text', text: message }] },
-				parent_tool_use_id: null
-			}) + '\n');
-
-			proc.stdout?.on('data', (d) => this.streamParser.parseChunk(d.toString(), spawnedConversationId));
-			proc.stderr?.on('data', (d) => { const e = d.toString(); if (e.trim()) this.postMessage({ type: 'error', data: `[CLI Error] ${e}`, conversationId: spawnedConversationId }); });
-			proc.on('close', () => this.handleProcessEnd(spawnedConversationId));
-			proc.on('error', (e) => this.handleProcessError(spawnedConversationId, e));
-		} catch (e: any) {
-			this.processingConversationIds.delete(spawnedConversationId);
-			this.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
-			this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: spawnedConversationId });
-			this.postMessage({ type: 'error', data: `Failed to start: ${e.message}`, conversationId: spawnedConversationId });
-			this.conversationHandler.sendActiveConversations();
-		}
-	}
-
-	private handleProcessEnd(convId: string) {
-		this.processingConversationIds.delete(convId);
-		if (this.processingConversationIds.size === 0) {
-			this.idleDetectionManager.stop();
-		}
-		this.postMessage({ type: 'clearLoading', conversationId: convId });
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: convId });
-		this.conversationHandler.sendActiveConversations();
-	}
-
-	private handleProcessError(convId: string, error: Error) {
-		this.processingConversationIds.delete(convId);
-		if (this.processingConversationIds.size === 0) {
-			this.idleDetectionManager.stop();
-		}
-		this.postMessage({ type: 'clearLoading', conversationId: convId });
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: convId });
-		this.conversationHandler.sendActiveConversations();
-		if (error.message.includes('ENOENT')) {
-			this.postMessage({ type: 'showInstallModal' });
-		} else {
-			this.postMessage({ type: 'error', data: `Error: ${error.message}`, conversationId: convId });
-		}
+		console.log('[Extension] Calling messageSender.sendMessage...');
+		await this.messageSender.sendMessage(message, { planMode: _planMode, thinkingMode, skipUIDisplay });
+		console.log('[Extension] messageSender.sendMessage completed');
 	}
 
 	private async stopCurrentProcess() {
@@ -513,201 +458,9 @@ class ClaudeChatProvider {
 		this.conversationHandler.sendActiveConversations();
 	}
 
-	/**
-	 * Execute slash commands - routes to appropriate handler based on command type
-	 */
-	private async executeSlashCommand(command: string) {
-		// Commands that run claude CLI and show output in chat
-		const cliCommands: Record<string, string[]> = {
-			'help': ['--help'],
-			'doctor': ['doctor'],
-			'config': ['config'],
-			'mcp': ['mcp'],
-			'status': ['status'],
-			'model': ['model'],
-			'permissions': ['permissions'],
-			'agents': ['agents']
-		};
-
-		// Commands handled directly by the extension
-		if (command === 'clear') {
-			await this.newSession();
-			return;
-		}
-
-		if (command === 'cost' || command === 'usage') {
-			this.sendCurrentUsage();
-			this.postMessage({ type: 'assistantMessage', data: '_Use the usage panel in the header to see detailed costs._' });
-			return;
-		}
-
-		// Commands that need terminal interaction (can't capture output easily)
-		const terminalCommands = ['login', 'logout', 'init', 'terminal-setup', 'vim'];
-		if (terminalCommands.includes(command)) {
-			openTerminal(`Claude ${command}`, `claude ${command}`);
-			this.postMessage({ type: 'assistantMessage', data: `_Opening terminal for \`claude ${command}\`..._` });
-			return;
-		}
-
-		// Commands that run and show output in chat
-		if (cliCommands[command]) {
-			await this.runClaudeCommandInChat(cliCommands[command]);
-			return;
-		}
-
-		// Commands that need to be sent to Claude as regular messages (they're prompts, not CLI commands)
-		const promptCommands = ['bug', 'review', 'pr_comments', 'add-dir', 'memory', 'compact', 'rewind'];
-		if (promptCommands.includes(command)) {
-			// These are actually prompts/tasks for Claude, send them as messages
-			// Use a flag to prevent infinite loop since the message starts with /
-			this.postMessage({ type: 'userInput', data: `/${command}` });
-			this.conversationManager.addMessage('userInput', `/${command}`, this.currentConversationId);
-			// Send without the slash to Claude
-			await this.sendRegularMessage(`Please help me with the /${command} task`);
-			return;
-		}
-
-		// Fallback: unknown command - show available commands
-		const availableCommands = [
-			...Object.keys(cliCommands),
-			'clear', 'cost', 'usage',
-			...terminalCommands,
-			...promptCommands
-		].sort().join(', ');
-		this.postMessage({
-			type: 'assistantMessage',
-			data: `Unknown command \`/${command}\`. Available commands: ${availableCommands}`
-		});
-	}
-
-	/**
-	 * Run a claude CLI command and display output in chat
-	 */
-	private async runClaudeCommandInChat(args: string[]) {
-		const cp = require('child_process');
-
-		// Find claude command
-		let claudeCommand = 'claude';
-		if (process.platform === 'darwin') {
-			const fs = require('fs');
-			if (fs.existsSync('/opt/homebrew/bin/claude')) {
-				claudeCommand = '/opt/homebrew/bin/claude';
-			} else if (fs.existsSync('/usr/local/bin/claude')) {
-				claudeCommand = '/usr/local/bin/claude';
-			}
-		}
-
-		this.postMessage({ type: 'loading', data: `Running \`claude ${args.join(' ')}\`...` });
-
-		try {
-			const result = await new Promise<string>((resolve, reject) => {
-				cp.execFile(claudeCommand, args, {
-					timeout: 30000,
-					maxBuffer: 1024 * 1024,
-					env: {
-						...process.env,
-						PATH: `${process.env.PATH || ''}:/opt/homebrew/bin:/usr/local/bin`,
-						FORCE_COLOR: '0',
-						NO_COLOR: '1'
-					}
-				}, (error: any, stdout: string, stderr: string) => {
-					if (error && !stdout) {
-						reject(new Error(stderr || error.message));
-					} else {
-						resolve(stdout || stderr);
-					}
-				});
-			});
-
-			this.postMessage({ type: 'clearLoading' });
-			// Format output as code block
-			const formattedOutput = '```\n' + result.trim() + '\n```';
-			this.postMessage({ type: 'assistantMessage', data: formattedOutput });
-			this.conversationManager.addMessage('assistantMessage', formattedOutput, this.currentConversationId);
-		} catch (error: any) {
-			this.postMessage({ type: 'clearLoading' });
-			this.postMessage({ type: 'error', data: `Command failed: ${error.message}` });
-		}
-	}
-
-	/**
-	 * Send a regular message to Claude (bypasses slash command detection)
-	 */
-	private async sendRegularMessage(message: string) {
-		// This is the actual message sending logic, extracted to avoid slash command loop
-		if (this.currentConversationId && this.processingConversationIds.has(this.currentConversationId)) {
-			await this.stopConversationProcess(this.currentConversationId);
-			this.postMessage({ type: 'assistantMessage', data: '⚠️ _Previous operation cancelled - starting new request..._' });
-			this.conversationManager.addMessage('assistantMessage', '⚠️ _Previous operation cancelled - starting new request..._', this.currentConversationId);
-		}
-
-		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-		const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
-
-		const args = ['--print', '--output-format', 'stream-json', '--input-format', 'stream-json', '--verbose', '--include-partial-messages'];
-		if (config.get<boolean>('permissions.yoloMode', false)) {
-			args.push('--dangerously-skip-permissions');
-		} else {
-			args.push('--permission-prompt-tool', 'stdio');
-		}
-		const mcpPath = this.mcpHandler.getConfigPath();
-		if (mcpPath) {
-			args.push('--mcp-config', mcpPath);
-		}
-		if (this.selectedModel && this.selectedModel !== 'default') {
-			args.push('--model', this.selectedModel);
-		}
-
-		const conversation = this.currentConversationId ? this.conversationManager.getConversation(this.currentConversationId) : null;
-		const sessionId = conversation?.sessionId;
-		if (sessionId) {
-			args.push('--resume', sessionId);
-		}
-
-		const spawnedConversationId = this.currentConversationId;
-		if (!spawnedConversationId) { this.postMessage({ type: 'error', data: 'No active conversation' }); return; }
-
-		this.processingConversationIds.add(spawnedConversationId);
-		await this.conversationManager.saveConversation(spawnedConversationId);
-		this.sendConversationList();
-		this.postMessage({ type: 'setProcessing', data: { isProcessing: true }, conversationId: spawnedConversationId });
-		this.postMessage({ type: 'loading', data: 'Claude is working...', conversationId: spawnedConversationId });
-		this.conversationHandler.sendActiveConversations();
-		this.idleDetectionManager.start();
-
-		try {
-			const proc = await this.processManager.spawnForConversation({
-				args, cwd,
-				wslEnabled: config.get('wsl.enabled', false),
-				wslDistro: config.get('wsl.distro', 'Ubuntu'),
-				nodePath: config.get('wsl.nodePath', '/usr/bin/node'),
-				claudePath: config.get('wsl.claudePath', '/usr/local/bin/claude')
-			}, spawnedConversationId);
-
-			this.processManager.writeToConversation(spawnedConversationId, JSON.stringify({
-				type: 'user', session_id: sessionId || '',
-				message: { role: 'user', content: [{ type: 'text', text: message }] },
-				parent_tool_use_id: null
-			}) + '\n');
-
-			proc.stdout?.on('data', (d: Buffer) => this.streamParser.parseChunk(d.toString(), spawnedConversationId));
-			proc.stderr?.on('data', (d: Buffer) => { const e = d.toString(); if (e.trim()) this.postMessage({ type: 'error', data: `[CLI Error] ${e}`, conversationId: spawnedConversationId }); });
-			proc.on('close', () => this.handleProcessEnd(spawnedConversationId));
-			proc.on('error', (e: Error) => this.handleProcessError(spawnedConversationId, e));
-		} catch (e: any) {
-			this.processingConversationIds.delete(spawnedConversationId);
-			this.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
-			this.postMessage({ type: 'setProcessing', data: { isProcessing: false }, conversationId: spawnedConversationId });
-			this.postMessage({ type: 'error', data: `Failed to start: ${e.message}`, conversationId: spawnedConversationId });
-			this.conversationHandler.sendActiveConversations();
-		}
-	}
-
 	private postMessage(message: any) { (this.panel?.webview || this.webview)?.postMessage(message); }
 
 	private sendReady() {
-		// Ensure a conversation exists - create one if needed
 		if (!this.currentConversationId) {
 			this.conversationManager.startConversation();
 			this.currentConversationId = this.conversationManager.getActiveConversationId();
@@ -753,13 +506,11 @@ class ClaudeChatProvider {
 		const workspaceRoot = workspaceFolders[0].uri.fsPath;
 
 		try {
-			// Find files in workspace, excluding common non-code directories
 			const pattern = '**/*';
 			const exclude = '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/.next/**,**/coverage/**,**/__pycache__/**,**/.venv/**,**/venv/**,**/*.min.js,**/*.min.css}';
 
 			const files = await vscode.workspace.findFiles(pattern, exclude, 100);
 
-			// Get file stats for sorting by mtime
 			const fileInfos = await Promise.all(
 				files.map(async (file) => {
 					try {
@@ -778,7 +529,6 @@ class ClaudeChatProvider {
 				})
 			);
 
-			// Filter out nulls and apply search filter if provided
 			let filtered = fileInfos.filter((f): f is NonNullable<typeof f> => f !== null);
 
 			if (searchTerm) {
@@ -789,10 +539,8 @@ class ClaudeChatProvider {
 				);
 			}
 
-			// Sort by most recently modified
 			filtered.sort((a, b) => b.mtime - a.mtime);
 
-			// Return top 50 results
 			return filtered.slice(0, 50);
 		} catch (error) {
 			console.error('Error getting recent files:', error);
@@ -803,7 +551,14 @@ class ClaudeChatProvider {
 	private getHtml(webview: vscode.Webview): string {
 		const cssUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'styles.css')).toString();
 		const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview', 'script.js')).toString();
-		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri);
+		const cytoscapeUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape', 'dist', 'cytoscape.min.js')).toString();
+		const layoutBaseUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'layout-base', 'layout-base.js')).toString();
+		const coseBaseUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cose-base', 'cose-base.js')).toString();
+		const coseBilkentUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-cose-bilkent', 'cytoscape-cose-bilkent.js')).toString();
+		const dagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'dagre', 'dist', 'dagre.min.js')).toString();
+		const cytoscapeDagreUri = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'node_modules', 'cytoscape-dagre', 'cytoscape-dagre.js')).toString();
+		const cspSource = webview.cspSource;
+		return getHtml(vscode.env?.isTelemetryEnabled, cssUri, scriptUri, cytoscapeUri, layoutBaseUri, coseBaseUri, coseBilkentUri, dagreUri, cytoscapeDagreUri, cspSource);
 	}
 
 	private async openFileWithEditHighlight(filePath: string, oldString: string, _newString: string) {
@@ -828,16 +583,10 @@ class ClaudeChatProvider {
 		} catch (e) { console.error('[openFileWithEditHighlight]', e); }
 	}
 
-	/**
-	 * Set Dev Mode Manager for self-modification
-	 */
 	setDevModeManager(devModeManager: DevModeManager): void {
 		this.devModeManager = devModeManager;
 	}
 
-	/**
-	 * Save conversation state (called before Dev Mode reload)
-	 */
 	async saveConversationState(): Promise<void> {
 		await this.conversationManager.saveConversation();
 	}

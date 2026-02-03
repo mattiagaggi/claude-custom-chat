@@ -77,6 +77,7 @@ function switchToConversation(conversationId) {
 		window.currentStreamingMessageId = null;
 	}
 
+	hideGraph();
 	renderConversationTabs();
 
 	// Send message to extension to switch conversation
@@ -131,13 +132,9 @@ function renderConversationTabs() {
 		return;
 	}
 
-	// Show/hide tabs container based on number of conversations
-	if (activeConversations.size > 1) {
-		tabsContainer.style.display = 'flex';
-	} else {
-		tabsContainer.style.display = 'none';
-		return;
-	}
+	// Show tab bar only if there are conversation tabs or graph tab is open
+	const hasTabs = activeConversations.size > 0 || window._graphTabOpen;
+	tabsContainer.style.display = hasTabs ? 'flex' : 'none';
 
 	// Clear existing tabs
 	tabsList.innerHTML = '';
@@ -167,7 +164,7 @@ function renderConversationTabs() {
 	activeConversations.forEach((conversation, conversationId) => {
 		const tab = document.createElement('div');
 		tab.className = 'conversation-tab';
-		if (conversationId === currentActiveConversationId) {
+		if (conversationId === currentActiveConversationId && !window._graphTabActive) {
 			tab.classList.add('active');
 		}
 
@@ -222,13 +219,40 @@ function renderConversationTabs() {
 
 		// Click handler to switch conversation
 		tab.onclick = () => {
-			if (conversationId !== currentActiveConversationId) {
+			if (conversationId !== currentActiveConversationId || window._graphTabActive) {
 				switchToConversation(conversationId);
 			}
 		};
 
 		tabsList.appendChild(tab);
 	});
+
+	// Add closeable Graph tab when open
+	if (window._graphTabOpen) {
+		const graphTab = document.createElement('div');
+		graphTab.className = 'conversation-tab graph-tab';
+		if (window._graphTabActive) {
+			graphTab.classList.add('active');
+		}
+
+		const graphTitle = document.createElement('span');
+		graphTitle.className = 'conversation-tab-title';
+		graphTitle.textContent = 'Graph';
+		graphTab.appendChild(graphTitle);
+
+		const closeBtn = document.createElement('span');
+		closeBtn.className = 'conversation-tab-close';
+		closeBtn.innerHTML = '✕';
+		closeBtn.addEventListener('click', (e) => {
+			e.preventDefault();
+			e.stopPropagation();
+			closeGraphTab();
+		});
+		graphTab.appendChild(closeBtn);
+
+		graphTab.onclick = () => switchMainTab('graph');
+		tabsList.appendChild(graphTab);
+	}
 }
 
 /**
