@@ -419,6 +419,8 @@ class ClaudeChatProvider {
 	}
 
 	private async sendMessageToClaude(message: string, _planMode?: boolean, thinkingMode?: boolean, skipUIDisplay?: boolean) {
+		console.log('[Extension] sendMessageToClaude called:', { message: message.substring(0, 50), _planMode, thinkingMode, skipUIDisplay });
+
 		// Detect slash commands typed in chat
 		const slashMatch = message.match(/^\/(\S+)(?:\s|$)/);
 		if (slashMatch) {
@@ -431,7 +433,9 @@ class ClaudeChatProvider {
 			return;
 		}
 
+		console.log('[Extension] Calling messageSender.sendMessage...');
 		await this.messageSender.sendMessage(message, { planMode: _planMode, thinkingMode, skipUIDisplay });
+		console.log('[Extension] messageSender.sendMessage completed');
 	}
 
 	private async stopCurrentProcess() {

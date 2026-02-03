@@ -57,7 +57,17 @@ export class ClaudeMessageSender {
 		}
 		const mcpPath = this.deps.mcpHandler.getConfigPath();
 		if (mcpPath) {
-			args.push('--mcp-config', mcpPath);
+			// Only add MCP config if the file actually exists
+			try {
+				const fs = require('fs');
+				if (fs.existsSync(mcpPath)) {
+					args.push('--mcp-config', mcpPath);
+				} else {
+					console.log('[Extension] MCP config file does not exist, skipping:', mcpPath);
+				}
+			} catch {
+				console.log('[Extension] Error checking MCP config, skipping');
+			}
 		}
 		if (thinkingMode) {
 			message = `${config.get<string>('thinking.intensity', 'think').toUpperCase().replace('-', ' ')} THROUGH THIS STEP BY STEP: \n${message}`;
@@ -119,12 +129,18 @@ export class ClaudeMessageSender {
 				claudePath: config.get('wsl.claudePath', '/usr/local/bin/claude')
 			}, spawnedConversationId);
 
-			this.deps.processManager.writeToConversation(spawnedConversationId, JSON.stringify({
-				type: 'user', session_id: sessionId || '',
-				message: { role: 'user', content: [{ type: 'text', text: message }] },
-				parent_tool_use_id: null
-			}) + '\n');
+			console.log('[Extension] Process spawned:', {
+				pid: proc.pid,
+				killed: proc.killed,
+				exitCode: proc.exitCode,
+				hasStdout: !!proc.stdout,
+				hasStderr: !!proc.stderr,
+				hasStdin: !!proc.stdin,
+				stdinWritable: proc.stdin?.writable,
+				stdoutReadable: proc.stdout?.readable
+			});
 
+			// Attach event handlers BEFORE writing to avoid race conditions
 			proc.stdout?.on('data', (d: Buffer) => {
 				console.log('[Extension] stdout received:', d.toString().substring(0, 200));
 				this.deps.streamParser.parseChunk(d.toString(), spawnedConversationId);
@@ -132,6 +148,22 @@ export class ClaudeMessageSender {
 			proc.stderr?.on('data', (d: Buffer) => { const e = d.toString(); console.log('[Extension] stderr received:', e); if (e.trim()) this.deps.postMessage({ type: 'error', data: `[CLI Error] ${e}`, conversationId: spawnedConversationId }); });
 			proc.on('close', (code) => { console.log('[Extension] Process closed with code:', code); this.handleProcessEnd(spawnedConversationId); });
 			proc.on('error', (e: Error) => { console.log('[Extension] Process error:', e); this.handleProcessError(spawnedConversationId, e); });
+			proc.on('exit', (code, signal) => { console.log('[Extension] Process exit event:', code, signal); });
+			proc.on('disconnect', () => { console.log('[Extension] Process disconnected'); });
+
+			// Now write to the process
+			const payload = JSON.stringify({
+				type: 'user', session_id: sessionId || '',
+				message: { role: 'user', content: [{ type: 'text', text: message }] },
+				parent_tool_use_id: null
+			}) + '\n';
+			console.log('[Extension] Writing payload:', payload);
+			this.deps.processManager.writeToConversation(spawnedConversationId, payload);
+
+			// End stdin to signal we're done sending input for this message
+			// This tells the CLI to process the input
+			console.log('[Extension] Ending stdin...');
+			proc.stdin?.end();
 		} catch (e: any) {
 			processingIds.delete(spawnedConversationId);
 			this.deps.postMessage({ type: 'clearLoading', conversationId: spawnedConversationId });
